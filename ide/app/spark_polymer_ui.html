@@ -7,6 +7,7 @@
 <!-- NOTE: If you add any new Polymer imports here, don't forget to also add
      matching Dart imports in spark_bootstrap.dart. -->
 <link rel="import" href="packages/spark_widgets/spark_button/spark_button.html">
+<link rel="import" href="packages/spark_widgets/spark_dialog/spark_dialog.html">
 <link rel="import" href="packages/spark_widgets/spark_menu_button/spark_menu_button.html">
 <link rel="import" href="packages/spark_widgets/spark_menu_item/spark_menu_item.html">
 <link rel="import" href="packages/spark_widgets/spark_menu_separator/spark_menu_separator.html">
@@ -85,561 +86,459 @@
     </spark-split-view>
 
     <!-- Error dialog -->
-    <spark-modal id="errorDialog" class="dialog" animation="scale-slideup">
-      <div class="modal-body">
-        <div class="form-group">
-          <label id="errorTitle"></label>
-          <div id="errorMessage" class="help-block"></div>
-        </div>
-      </div>
-      <div class="modal-footer">
+    <spark-dialog id="errorDialog"  animation="scale-slideup">
+      <label id="errorTitle"></label>
+      <div id="errorMessage" class="help-block"></div>
+      <!--div class="modal-footer">
         <spark-button id="errorClose" overlay-toggle primary focused data-dismiss="modal">
           Close
         </spark-button>
-      </div>
-    </spark-modal>
+      </div-->
+    </spark-dialog>
 
     <!-- OK / Cancel dialog -->
-    <spark-modal id="okCancelDialog" class="dialog" animation="scale-slideup">
-      <div class="modal-body">
-        <p id="okCancelMessage"></p>
-      </div>
-      <div class="modal-footer">
+    <spark-dialog id="okCancelDialog"  animation="scale-slideup">
+      <p id="okCancelMessage"></p>
+      <!--div class="modal-footer">
         <spark-button overlay-toggle data-dismiss="modal">
           Cancel
         </spark-button>
         <spark-button id="okText" overlay-toggle primary focused data-dismiss="modal">
           OK
         </spark-button>
-      </div>
-    </spark-modal>
+      </div-->
+    </spark-dialog>
 
     <!-- Rename File dialog -->
-    <spark-modal id="renameDialog" class="dialog" animation="scale-slideup">
-      <div class="modal-header">
-        <a href="#" class="close" overlay-toggle>&times;</a>
-        <h4 class="modal-title">Rename</h4>
-      </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label for="renameFileName">New name</label>
-          <input id="renameFileName" type="text" class="form-control"
-              spellcheck="false" focused>
-        </div>
-      </div>
-      <div class="modal-footer">
+    <spark-dialog id="renameDialog"
+        title="Rename" animation="scale-slideup">
+      <label for="renameFileName">New name</label>
+      <input id="renameFileName" type="text" class="form-control"
+          spellcheck="false" focused>
+      <!--div class="modal-footer">
         <spark-button overlay-toggle data-dismiss="modal">
           Cancel
         </spark-button>
         <spark-button overlay-toggle primary data-dismiss="modal">
           Rename
         </spark-button>
-      </div>
-    </spark-modal>
+      </div-->
+    </spark-dialog>
 
     <!-- New File dialog -->
-    <spark-modal id="fileNewDialog" class="dialog" animation="scale-slideup">
-      <div class="modal-header">
-        <a href="#" class="close" overlay-toggle>&times;</a>
-        <h4 class="modal-title">New File</h4>
-      </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label for="fileName">New file name</label>
-          <input id="fileName" type="text" class="form-control"
-              spellcheck="false" focused>
-        </div>
-      </div>
-      <div class="modal-footer">
+    <spark-dialog id="fileNewDialog"
+        title="New File" animation="scale-slideup">
+      <label for="fileName">New file name</label>
+      <input id="fileName" type="text" class="form-control"
+          spellcheck="false" focused>
+      <!--div class="modal-footer">
         <spark-button overlay-toggle data-dismiss="modal">
           Cancel
         </spark-button>
         <spark-button overlay-toggle primary data-dismiss="modal">
           Create
         </spark-button>
-      </div>
-    </spark-modal>
+      </div-->
+    </spark-dialog>
 
     <!-- New Folder dialog -->
-    <spark-modal id="folderNewDialog" class="dialog" animation="scale-slideup">
-      <div class="modal-header">
-        <a href="#" class="close" overlay-toggle>&times;</a>
-        <h4 class="modal-title">New Folder</h4>
-      </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label for="folderName">New folder name</label>
-          <input id="folderName" type="text" class="form-control"
-              spellcheck="false" focused>
-        </div>
-      </div>
-      <div class="modal-footer">
+    <spark-dialog id="folderNewDialog"
+        title="New Folder" animation="scale-slideup">
+      <label for="folderName">New folder name</label>
+      <input id="folderName" type="text" class="form-control"
+          spellcheck="false" focused>
+      <!--div class="modal-footer">
         <spark-button overlay-toggle data-dismiss="modal">
           Cancel
         </spark-button>
         <spark-button overlay-toggle primary data-dismiss="modal">
           Create
         </spark-button>
-      </div>
-    </spark-modal>
+      </div-->
+    </spark-dialog>
 
     <!-- New Project dialog -->
-    <spark-modal id="newProjectDialog" class="dialog" animation="scale-slideup">
-      <div class="modal-header">
-        <a href="#" class="close" overlay-toggle>&times;</a>
-        <h4 class="modal-title">New Project</h4>
+    <spark-dialog id="newProjectDialog"
+        title="New Project"
+        buttons="Cancel:cancel;Create:submit,default"
+        animation="scale-slideup">
+      <div class="form-group">
+        <label for="name">Project name</label>
+        <input id="name" type="text" class="form-control"
+            pattern="\S+" placeholder="HelloWorld" spellcheck="false"
+            autosave focused />
       </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label for="name">Project name</label>
-          <input id="name" type="text" class="form-control"
-              pattern="\S+" placeholder="HelloWorld" spellcheck="false"
-              autosave focused />
-        </div>
-        <div class="form-group">
-          <label for="type">Project type</label>
-          <select name="type" class="form-control" autosave>
-            <option value="empty">
-              Blank project
+      <div class="form-group">
+        <label for="type">Project type</label>
+        <select name="type" class="form-control" autosave>
+          <option value="empty">
+            Blank project
+          </option>
+          <optgroup label="Web apps">
+            <option value="web-js">
+              Web app (JavaScript)
             </option>
-            <optgroup label="Web apps">
-              <option value="web-js">
-                Web app (JavaScript)
-              </option>
-              <option value="web-js+polymer,polymer-elements,polymer-ui-elements">
-                Web app (JavaScript + Polymer)
-              </option>
-              <option value="web-dart">
-                Web app (Dart)
-              </option>
-            </optgroup>
-            <optgroup label="Chrome apps and extensions">
-              <option value="app-js">
-                Chrome app (JavaScript)
-              </option>
-              <option value="app-js+polymer,polymer-elements,polymer-ui-elements">
-                Chrome app (JavaScript + Polymer)
-              </option>
-              <option value="ext-js">
-                Chrome extension (JavaScript)
-              </option>
-              <option value="ext-js+polymer,polymer-elements,polymer-ui-elements">
-                Chrome extension (JavaScript + Polymer)
-              </option>
-            </optgroup>
-            <optgroup label="Other">
-              <option value="polymer-elt-dart">
-                Polymer custom element (Dart)
-              </option>
-            </optgroup>
-          </select>
-        </div>
+            <option value="web-js+polymer,polymer-elements,polymer-ui-elements">
+              Web app (JavaScript + Polymer)
+            </option>
+            <option value="web-dart">
+              Web app (Dart)
+            </option>
+          </optgroup>
+          <optgroup label="Chrome apps and extensions">
+            <option value="app-js">
+              Chrome app (JavaScript)
+            </option>
+            <option value="app-js+polymer,polymer-elements,polymer-ui-elements">
+              Chrome app (JavaScript + Polymer)
+            </option>
+            <option value="ext-js">
+              Chrome extension (JavaScript)
+            </option>
+            <option value="ext-js+polymer,polymer-elements,polymer-ui-elements">
+              Chrome extension (JavaScript + Polymer)
+            </option>
+          </optgroup>
+          <optgroup label="Other">
+            <option value="polymer-elt-dart">
+              Polymer custom element (Dart)
+            </option>
+          </optgroup>
+        </select>
       </div>
-      <div class="modal-footer">
-        <spark-button overlay-toggle data-dismiss="modal">
-          Cancel
-        </spark-button>
-        <spark-button overlay-toggle primary data-dismiss="modal">
-          Create
-        </spark-button>
-      </div>
-    </spark-modal>
+    </spark-dialog>
 
     <!-- Harness Push dialog -->
-    <spark-modal id="pushDialog" class="dialog" animation="scale-slideup">
-      <div class="modal-header">
-        <a href="#" class="close" overlay-toggle>&times;</a>
-        <h4 class="modal-title">Deploy to Mobile</h4>
+    <spark-dialog id="pushDialog"
+        title="Deploy to Mobile" animation="scale-slideup">
+      <h4>Deploy a Chrome App to an Android Device</h4>
+      <p>
+        You need to have the
+        <a href="https://github.com/MobileChromeApps/harness/releases/"
+            on-click="{{handleAnchorClick}}">
+          ChromeAPT.apk
+        </a>
+        installed on your Android phone or tablet.
+      </p>
+      <div class="form-group">
+        <form>
+          <div>
+            <input id="adb" type="radio" name="type" value="push-adb" checked />
+            <label for="adb">Deploy via USB</label>
+          </div>
+          <div>
+            <input id="ip" type="radio" name="type" value="push-ip" autosave />
+            <label for="ip">Deploy to a network host</label>
+            <input id="pushUrl" type="text" class="form-control"
+                placeholder="e.g. 192.168.1.101"
+                pattern="(\d{1,3}\.){3}\d{1,3}" spellcheck="false" autosave/>
+          </div>
+        </form>
       </div>
-      <div class="modal-body">
-        <h4>Deploy a Chrome App to an Android Device</h4>
-        <p>
-          You need to have the
-          <a href="https://github.com/MobileChromeApps/harness/releases/"
-              on-click="{{handleAnchorClick}}">
-            ChromeAPT.apk
-          </a>
-          installed on your Android phone or tablet.
-        </p>
-        <div class="form-group">
-          <form>
-            <div>
-              <input id="adb" type="radio" name="type" value="push-adb" checked />
-              <label for="adb">Deploy via USB</label>
-            </div>
-            <div>
-              <input id="ip" type="radio" name="type" value="push-ip" autosave />
-              <label for="ip">Deploy to a network host</label>
-              <input id="pushUrl" type="text" class="form-control"
-                  placeholder="e.g. 192.168.1.101"
-                  pattern="(\d{1,3}\.){3}\d{1,3}" spellcheck="false" autosave/>
-            </div>
-          </form>
-        </div>
-      </div>
-      <div class="modal-footer">
+      <!--div class="modal-footer">
         <spark-button overlay-toggle data-dismiss="modal">
           Cancel
         </spark-button>
         <spark-button overlay-toggle primary focused data-dismiss="modal">
           Deploy
         </spark-button>
-      </div>
-    </spark-modal>
+      </div-->
+    </spark-dialog>
 
     <!-- Git Clone dialog -->
-    <spark-modal id="gitCloneDialog" class="dialog" animation="scale-slideup">
-      <div class="modal-header">
-        <a href="#" class="close" overlay-toggle>&times;</a>
-        <h4 class="modal-title">Clone Git Project</h4>
-      </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label for="gitRepoUrl">Repository URL</label>
-          <input id="gitRepoUrl" type="url" class="form-control"
-              placeholder="https://github.com/dart-lang/spark.git"
-              spellcheck="false" autosave focused>
-        </div>
-      </div>
-      <div class="modal-footer">
+    <spark-dialog id="gitCloneDialog"
+        title="Clone Git Project" animation="scale-slideup">
+      <label for="gitRepoUrl">Repository URL</label>
+      <input id="gitRepoUrl" type="url" class="form-control"
+          placeholder="https://github.com/dart-lang/spark.git"
+          spellcheck="false" autosave focused>
+      <!--div class="modal-footer">
         <spark-button overlay-toggle data-dismiss="modal">
           Cancel
         </spark-button>
         <spark-button overlay-toggle primary data-dismiss="modal">
           Clone
         </spark-button>
-      </div>
-    </spark-modal>
+      </div-->
+    </spark-dialog>
 
     <!-- Git Commit dialog -->
-    <spark-modal id="gitCommitDialog" class="dialog" animation="scale-slideup">
-      <div class="modal-header">
-        <a href="#" class="close" overlay-toggle>&times;</a>
-        <h4 class="modal-title">Git Commit</h4>
-      </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <div id="gitUserInfo">
-            <div class="input-label">
-              <label for="gitName">Your Name</label>
-              <input id="gitName" type="text" class="form-control"
-                  placeholder="John Doe" spellcheck="false" autosave focused>
-            </div>
-            <div class="input-label">
-              <label for="gitEmail">Email</label>
-              <input id="gitEmail" type="email" class="form-control"
-                  placeholder="johndoe@gmail.com" spellcheck="false" autosave>
-            </div>
-          </div>
-        </div>
+    <spark-dialog id="gitCommitDialog"
+        title="Git Commit" animation="scale-slideup">
+      <div class="form-group">
+        <div id="gitUserInfo">
           <div class="input-label">
-            <label id="changeLabel">Changes</label>
-            <div id="gitStatusDiv">
-               <span id="gitStatus"></span>
-               <a href="#" id="gitStatusDetail">Details...</a>
-            </div>
+            <label for="gitName">Your Name</label>
+            <input id="gitName" type="text" class="form-control"
+                placeholder="John Doe" spellcheck="false" autosave focused>
           </div>
-          <div id="gitChangeList"></div>
-        <div class="form-group">
-          <label for="commitMessage">Commit Message</label>
-          <textarea id="commitMessage" type="text" class="form-control"
-              rows="3" wrap="soft" spellcheck autosave></textarea>
-          <span class="help-block">Enter a brief description of the changes.</span>
+          <div class="input-label">
+            <label for="gitEmail">Email</label>
+            <input id="gitEmail" type="email" class="form-control"
+                placeholder="johndoe@gmail.com" spellcheck="false" autosave>
+          </div>
         </div>
       </div>
-      <div class="modal-footer">
+      <div class="input-label">
+        <label id="changeLabel">Changes</label>
+        <div id="gitStatusDiv">
+           <span id="gitStatus"></span>
+           <a href="#" id="gitStatusDetail">Details...</a>
+        </div>
+      </div>
+      <div id="gitChangeList"></div>
+      <div class="form-group">
+        <label for="commitMessage">Commit Message</label>
+        <textarea id="commitMessage" type="text" class="form-control"
+            rows="3" wrap="soft" spellcheck autosave></textarea>
+        <span class="help-block">
+          Enter a brief description of the changes.
+        </span>
+      </div>
+      <!--div class="modal-footer">
         <spark-button overlay-toggle data-dismiss="modal">
           Cancel
         </spark-button>
         <spark-button overlay-toggle primary data-dismiss="modal">
           Commit
         </spark-button>
-      </div>
-    </spark-modal>
+      </div-->
+    </spark-dialog>
 
     <!-- Git Branch dialog -->
-    <spark-modal id="gitBranchDialog" class="dialog" animation="scale-slideup">
-      <div class="modal-header">
-        <a href="#" class="close" overlay-toggle>&times;</a>
-        <h4 class="modal-title">Create Branch</h4>
-      </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label for="gitBranchName">New branch name</label>
-          <input id="gitBranchName" type="text" class="form-control"
-              pattern="[^~:?*\^\[\s]+" spellcheck="false" autosave focused>
-          <span class="help-block">Create a new git branch.</span>
-        </div>
-      </div>
-      <div class="modal-footer">
+    <spark-dialog id="gitBranchDialog"
+        title="Create Branch" animation="scale-slideup">
+      <label for="gitBranchName">New branch name</label>
+      <input id="gitBranchName" type="text" class="form-control"
+          pattern="[^~:?*\^\[\s]+" spellcheck="false" autosave focused>
+      <span class="help-block">Create a new git branch.</span>
+      <!--div class="modal-footer">
         <spark-button overlay-toggle data-dismiss="modal">
           Cancel
         </spark-button>
         <spark-button overlay-toggle primary data-dismiss="modal">
           Create Branch
         </spark-button>
-      </div>
-    </spark-modal>
+      </div-->
+    </spark-dialog>
 
     <!-- Git Checkout dialog -->
-    <spark-modal id="gitCheckoutDialog" class="dialog" animation="scale-slideup">
-      <div class="modal-header">
-        <a href="#" class="close" overlay-toggle>&times;</a>
-        <h4 class="modal-title">Git Checkout</h4>
+    <spark-dialog id="gitCheckoutDialog"
+        title="Git Checkout" animation="scale-slideup">
+      <div class="form-group">
+        <label for="currentBranchName">Current branch</label>
+        <input id="currentBranchName" type="text" class="form-control"
+            spellcheck="false" disabled>
       </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label for="currentBranchName">Current branch</label>
-          <input id="currentBranchName" type="text" class="form-control"
-              spellcheck="false" disabled>
-        </div>
-        <div class="form-group">
-          <label for="gitCheckout">Switch to branch</label>
-          <select id="gitCheckout" class="form-control"></select>
-        </div>
+      <div class="form-group">
+        <label for="gitCheckout">Switch to branch</label>
+        <select id="gitCheckout" class="form-control"></select>
       </div>
-      <div class="modal-footer">
+      <!--div class="modal-footer">
         <spark-button overlay-toggle data-dismiss="modal">
           Cancel
         </spark-button>
         <spark-button overlay-toggle primary data-dismiss="modal">
           Checkout
         </spark-button>
-      </div>
-    </spark-modal>
+      </div-->
+    </spark-dialog>
 
     <!-- Git Push dialog -->
-    <spark-modal id="gitPushDialog" class="dialog" animation="scale-slideup">
-      <div class="modal-header">
-        <a href="#" class="close" overlay-toggle>&times;</a>
-        <h4 class="modal-title">Git Push</h4>
-      </div>
-      <div class="modal-body">
-        <div class="form-group">
-           <div id="gitCommitList"></div>
-        </div>
-      </div>
-      <div class="modal-footer">
+    <spark-dialog id="gitPushDialog"
+        title="Git Push" animation="scale-slideup">
+      <div id="gitCommitList"></div>
+      <!--div class="modal-footer">
         <spark-button overlay-toggle data-dismiss="modal">
           Cancel
         </spark-button>
         <spark-button overlay-toggle primary data-dismiss="modal">
           Push
         </spark-button>
-      </div>
-    </spark-modal>
+      </div-->
+    </spark-dialog>
 
     <!-- About dialog -->
-    <spark-modal id="aboutDialog" class="dialog" animation="scale-slideup">
-      <div class="modal-header">
-        <a href="#" class="close" overlay-toggle>&times;</a>
-        <h4 class="modal-title">Spark</h4>
+    <spark-dialog id="aboutDialog"
+        title="Spark" animation="scale-slideup">
+      <div class="form-group">
+        <span class="help-block">
+          A Chrome Apps based development environment (v<span id="aboutVersion"></span>)
+        </span>
       </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <span class="help-block">
-            A Chrome Apps based development environment (v<span id="aboutVersion"></span>)
-          </span>
-        </div>
-        <div class="form-group">
-          <div class="checkbox">
-            <input id="analyticsCheck" type="checkbox">
-            <label for="analyticsCheck">
-              Allow Spark to collect anonymous usage statistics
-            </label>
-          </div>
+      <div class="form-group">
+        <div class="checkbox">
+          <input id="analyticsCheck" type="checkbox">
+          <label for="analyticsCheck">
+            Allow Spark to collect anonymous usage statistics
+          </label>
         </div>
       </div>
-      <div class="modal-footer">
+      <!--div class="modal-footer">
         <spark-button overlay-toggle primary focused data-dismiss="modal">
           Close
         </spark-button>
-      </div>
-    </spark-modal>
+      </div-->
+    </spark-dialog>
 
     <!-- Setting dialog -->
-    <spark-modal id="settingsDialog" class="dialog" animation="scale-slideup">
-      <div class="modal-header">
-        <a href="#" class="close" overlay-toggle>&times;</a>
-        <h4 class="modal-title">Settings</h4>
-      </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <div class="checkbox">
-            <input id="stripWhitespace" type="checkbox">
-            <label for="stripWhitespace">
-              Strip trailing whitespace on save
-            </label>
-          </div>
+    <spark-dialog id="settingsDialog"
+        title="Settings" animation="scale-slideup">
+      <div class="form-group">
+        <div class="checkbox">
+          <input id="stripWhitespace" type="checkbox">
+          <label for="stripWhitespace">
+            Strip trailing whitespace on save
+          </label>
         </div>
-        <template if="{{useAceThemes}}">
-          <div class="form-group">
-            <div id="changeTheme">
-              <label class="settings-title">Editor theme</label>
-              <div>
-                <span class="settings-label"></span>
-                <span class="plus-minus-container">
-                  <a href="#" id="themeMinus" class="plus-minus-button"
-                      on-click="{{onThemeMinus}}">
-                    <span class="glyphicon glyphicon-chevron-left"></span>
-                  </a>
-                  <a href="#" id="themePlus" class="plus-minus-button"
-                      on-click="{{onThemePlus}}">
-                    <span class="glyphicon glyphicon-chevron-right"></span>
-                  </a>
-                </span>
-              </div>
-            </div>
-          </div>
-        </template>
+      </div>
+      <template if="{{useAceThemes}}">
         <div class="form-group">
-          <div id="changeKeys">
-            <label class="settings-title">Key bindings</label>
+          <div id="changeTheme">
+            <label class="settings-title">Editor theme</label>
             <div>
               <span class="settings-label"></span>
               <span class="plus-minus-container">
-                <a href="#" id="keysMinus" class="plus-minus-button"
-                    on-click="{{onKeysMinus}}">
+                <a href="#" id="themeMinus" class="plus-minus-button"
+                    on-click="{{onThemeMinus}}">
                   <span class="glyphicon glyphicon-chevron-left"></span>
                 </a>
-                <a href="#" id="keysPlus" class="plus-minus-button"
-                    on-click="{{onKeysPlus}}">
+                <a href="#" id="themePlus" class="plus-minus-button"
+                    on-click="{{onThemePlus}}">
                   <span class="glyphicon glyphicon-chevron-right"></span>
                 </a>
               </span>
             </div>
           </div>
         </div>
-        <div class="form-group">
-          <label class="settings-title">Git</label>
+      </template>
+      <div class="form-group">
+        <div id="changeKeys">
+          <label class="settings-title">Key bindings</label>
           <div>
-            <spark-button on-click="{{onResetGit}}">
-              Clear Git Credentials
-            </spark-button>
-            <span id="gitResetSettingsDone">Done</span>
+            <span class="settings-label"></span>
+            <span class="plus-minus-container">
+              <a href="#" id="keysMinus" class="plus-minus-button"
+                  on-click="{{onKeysMinus}}">
+                <span class="glyphicon glyphicon-chevron-left"></span>
+              </a>
+              <a href="#" id="keysPlus" class="plus-minus-button"
+                  on-click="{{onKeysPlus}}">
+                <span class="glyphicon glyphicon-chevron-right"></span>
+              </a>
+            </span>
           </div>
         </div>
-        <template if="{{!chromeOS}}">
-          <div class="form-group">
-            <label class="settings-title">Root directory</label>
-            <div>
-              <span id="directory-label" class="settings-label"></span>
-            </div>
-          </div>
-        </template>
-        <template if="{{developerMode}}">
-          <div class="form-group">
-            <label class="settings-title">Preferences</label>
-            <div>
-              <spark-button on-click="{{onResetPreference}}">
-                Reset Preferences
-              </spark-button>
-              <span id="preferenceResetResult"></span>
-            </div>
-          </div>
-        </template>
       </div>
-      <div class="modal-footer">
+      <div class="form-group">
+        <label class="settings-title">Git</label>
+        <div>
+          <spark-button on-click="{{onResetGit}}">
+            Clear Git Credentials
+          </spark-button>
+          <span id="gitResetSettingsDone">Done</span>
+        </div>
+      </div>
+      <template if="{{!chromeOS}}">
+        <div class="form-group">
+          <label class="settings-title">Root directory</label>
+          <div>
+            <span id="directory-label" class="settings-label"></span>
+          </div>
+        </div>
+      </template>
+      <template if="{{developerMode}}">
+        <div class="form-group">
+          <label class="settings-title">Preferences</label>
+          <div>
+            <spark-button on-click="{{onResetPreference}}">
+              Reset Preferences
+            </spark-button>
+            <span id="preferenceResetResult"></span>
+          </div>
+        </div>
+      </template>
+      <!--div class="modal-footer">
         <spark-button overlay-toggle primary focused data-dismiss="modal">
           Close
         </spark-button>
-      </div>
-    </spark-modal>
+      </div-->
+    </spark-dialog>
 
     <!-- Git authentication dialog -->
-    <spark-modal id="gitAuthenticationDialog" class="dialog" animation="scale-slideup">
-      <div class="modal-header">
-        <a href="#" class="close" overlay-toggle>&times;</a>
-        <h4 class="modal-title">Git Authentication</h4>
-      </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <div id="gitUserInfo">
-            <div class="input-label">
-              <label for="gitUsername">User name</label>
-              <input id="gitUsername" type="text" class="form-control"
-                  placeholder="johndoe" pattern="\S+" spellcheck="false"
-                  autosave focused>
-            </div>
-            <div class="input-label">
-              <label for="gitPassword">Password</label>
-              <input id="gitPassword" type="password" class="form-control"
-                  placeholder="Required">
-            </div>
-          </div>
+    <spark-dialog id="gitAuthenticationDialog"
+        title="Git Authentication" animation="scale-slideup">
+      <div id="gitUserInfo">
+        <div class="input-label">
+          <label for="gitUsername">User name</label>
+          <input id="gitUsername" type="text" class="form-control"
+              placeholder="johndoe" pattern="\S+" spellcheck="false"
+              autosave focused>
+        </div>
+        <div class="input-label">
+          <label for="gitPassword">Password</label>
+          <input id="gitPassword" type="password" class="form-control"
+              placeholder="Required">
         </div>
       </div>
-      <div class="modal-footer">
-        <spark-button overlay-toggle data-dismiss="modal" class="cancel-button">
+      <!--div class="modal-footer">
+        <spark-button overlay-toggle cancel data-dismiss="modal">
           Cancel
         </spark-button>
         <spark-button overlay-toggle primary data-dismiss="modal">
           Login
         </spark-button>
-      </div>
-    </spark-modal>
+      </div-->
+    </spark-dialog>
 
     <!-- Publish on webstore -->
-    <spark-modal id="webStorePublishDialog" class="dialog" animation="scale-slideup">
-      <div class="modal-header">
-        <a href="#" class="close" overlay-toggle>&times;</a>
-        <h4 class="modal-title">Publish to Chrome Web Store</h4>
+    <spark-dialog id="webStorePublishDialog"
+        title="Publish to Chrome Web Store" animation="scale-slideup">
+      <div class="form-group">
+        <form>
+          <div>
+            <input type="radio" name="type" value="new" id="new-app-radio" checked>
+            <label for="new-app-radio">Create a new application</label>
+          </div>
+          <div>
+            <input type="radio" name="type" value="existing" id="existing-app-radio">
+            <label for="existing-app-radio">Upload to an existing application</label>
+          </div>
+        </form>
       </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <form>
-            <div>
-              <input type="radio" name="type" value="new" id="new-app-radio" checked>
-              <label for="new-app-radio">Create a new application</label>
-            </div>
-            <div>
-              <input type="radio" name="type" value="existing" id="existing-app-radio">
-              <label for="existing-app-radio">Upload to an existing application</label>
-            </div>
-          </form>
-        </div>
-        <div class="form-group">
-          <label for="appID">Enter the ID of the existing application</label>
-          <input id="appID" type="text" class="form-control"
-              placeholder="abcdefghijklmnopqrstuvwxyzabcdef" pattern="[a-z]{32}"
-              spellcheck="false" autosave>
-        </div>
+      <div class="form-group">
+        <label for="appID">Enter the ID of the existing application</label>
+        <input id="appID" type="text" class="form-control"
+            placeholder="abcdefghijklmnopqrstuvwxyzabcdef" pattern="[a-z]{32}"
+            spellcheck="false" autosave>
       </div>
-      <div class="modal-footer">
+      <!--div class="modal-footer">
         <spark-button overlay-toggle data-dismiss="modal">
           Cancel
         </spark-button>
         <spark-button overlay-toggle primary focused data-dismiss="modal">
           Publish
         </spark-button>
-      </div>
-    </spark-modal>
+      </div-->
+    </spark-dialog>
 
     <!-- Properties dialog -->
-    <spark-modal id="propertiesDialog" class="dialog" animation="scale-slideup">
-      <div class="modal-header">
-        <a href="#" class="close" overlay-toggle>&times;</a>
-        <h4 class="modal-title">Properties</h4>
-      </div>
-      <div class="modal-body">
-      </div>
-      <div class="modal-footer">
+    <spark-dialog id="propertiesDialog"
+        title="Properties" animation="scale-slideup">
+      <!--div class="modal-footer">
         <spark-button overlay-toggle primary focused data-dismiss="modal">
           Close
         </spark-button>
-      </div>
-    </spark-modal>
+      </div-->
+    </spark-dialog>
 
     <!-- Chrome WebStore published dialog -->
-    <spark-modal id="webStorePublishedDialog" class="dialog" animation="scale-slideup">
-      <div class="modal-body">
-        <div class="form-group">
-          <label>Your application has been published</label>
-          <div class="help-block">
-            An updated version of your application has been uploaded and
-            published. You can now see it on the Chrome Web Store.
-          </div>
-        </div>
+    <spark-dialog id="webStorePublishedDialog"
+        animation="scale-slideup">
+      <label>Your application has been published</label>
+      <div class="help-block">
+        An updated version of your application has been uploaded and
+        published. You can now see it on the Chrome Web Store.
       </div>
       <div class="modal-footer">
         <spark-button id="webStorePublishedAction" overlay-toggle data-dismiss="modal">
@@ -649,19 +548,16 @@
           Close
         </spark-button>
       </div>
-    </spark-modal>
+    </spark-dialog>
 
     <!-- Chrome WebStore first upload dialog -->
-    <spark-modal id="webStoreUploadedDialog" class="dialog" animation="scale-slideup">
-      <div class="modal-body">
-        <div class="form-group">
-          <label>Your application has been uploaded</label>
-          <div class="help-block">
-            Your application has been uploaded on the Chrome Web Store.
-            You still need to fill out some additional information in the
-            Developer Dashboard before publishing it.
-          </div>
-        </div>
+    <spark-dialog id="webStoreUploadedDialog"
+        animation="scale-slideup">
+      <label>Your application has been uploaded</label>
+      <div class="help-block">
+        Your application has been uploaded to the Chrome Web Store.
+        You still need to fill out some additional information in the
+        Developer Dashboard before publishing it.
       </div>
       <div class="modal-footer">
         <spark-button id="webStoreUploadedAction" overlay-toggle data-dismiss="modal">
@@ -671,20 +567,17 @@
           Close
         </spark-button>
       </div>
-    </spark-modal>
+    </spark-dialog>
 
     <!-- Dialog shown while pushing an application to ADB. -->
-    <spark-modal id="pushADBProgressDialog" class="dialog" animation="scale-slideup">
-      <div class="modal-body">
-        <div class="form-group">
-          <label>Push to the mobile device in progress</label>
-          <div class="help-block">
-            Please unlock the phone and check whether it's asking for a
-            connection authorization.
-          </div>
-        </div>
+    <spark-dialog id="pushADBProgressDialog"
+        animation="scale-slideup">
+      <label>Push to the mobile device in progress</label>
+      <div class="help-block">
+        Please unlock the phone and check whether it's asking for a
+        connection authorization.
       </div>
-    </spark-modal>
+    </spark-dialog>
   </template>
 
   <script type="application/dart;component=1" src="spark_polymer_ui.dart"></script>

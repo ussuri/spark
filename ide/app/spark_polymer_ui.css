@@ -32,39 +32,20 @@
   top: 4px;
 }
 
-.dialog {
+spark-dialog {
+  box-sizing: border-box;
   top: 72px;
   left: 50%;
   width: 512px;
   margin-left: -256px;
-  border-radius: 5px;
 }
 
-.dialog input[type="text"] {
+spark-dialog input[type="text"] {
   width: 100%;
 }
 
-.dialog input:invalid {
+spark-dialog input:invalid {
   color: red;
-}
-
-.dialog {
-  box-sizing: border-box;
-  -moz-box-sizing: border-box;
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 13px;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  overflow: hidden;
-  background: white;
-  outline: 1px solid rgba(0, 0, 0, 0.2);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-}
-
-.dialog a.close {
-  width: 21px;
-  height: 21px;
-  text-align: center;
 }
 
 #toolbar {

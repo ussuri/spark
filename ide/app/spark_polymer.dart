@@ -9,7 +9,7 @@ import 'dart:html';
 
 import 'package:polymer/polymer.dart' as polymer;
 import 'package:spark_widgets/spark_button/spark_button.dart';
-import 'package:spark_widgets/spark_modal/spark_modal.dart';
+import 'package:spark_widgets/spark_dialog/spark_dialog.dart';
 
 import 'spark.dart';
 import 'spark_flags.dart';
@@ -62,8 +62,8 @@ void main() {
   });
 }
 
-class SparkPolymerDialog implements SparkDialog {
-  SparkModal _dialogElement;
+class SparkPolymerDialog implements Dialog {
+  SparkDialog _dialogElement;
 
   SparkPolymerDialog(Element dialogElement)
       : _dialogElement = dialogElement {
@@ -74,19 +74,25 @@ class SparkPolymerDialog implements SparkDialog {
   }
 
   @override
-  void show() {
-    if (!_dialogElement.opened) {
-      _dialogElement.toggle();
-    }
-  }
-
-  // TODO(ussuri): Currently, this never gets called (the dialog closes in
-  // another way). Make symmetrical when merging Polymer and non-Polymer.
-  @override
-  void hide() => _dialogElement.toggle();
+  void show() => _dialogElement.show();
 
   @override
-  Element get element => _dialogElement;
+  void hide() => _dialogElement.hide();
+
+  @override
+  Element get dialog => _dialogElement;
+
+  @override
+  Element getElement(String selectors) =>
+      _dialogElement.querySelector(selectors);
+
+  @override
+  List<Element> getElements(String selectors) =>
+      _dialogElement.querySelectorAll(selectors);
+
+  @override
+  Element getShadowDomElement(String selectors) =>
+      _dialogElement.shadowRoot.querySelector(selectors);
 }
 
 class SparkPolymer extends Spark {
@@ -134,7 +140,7 @@ class SparkPolymer extends Spark {
       _ui.getShadowDomElement(selectors);
 
   @override
-  SparkDialog createDialog(Element dialogElement) =>
+  Dialog createDialog(Element dialogElement) =>
       new SparkPolymerDialog(dialogElement);
 
   //

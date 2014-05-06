@@ -13,6 +13,7 @@ import 'package:intl/intl.dart';
 import 'package:logging/logging.dart';
 import 'package:path/path.dart' as path;
 import 'package:spark_widgets/spark_status/spark_status.dart';
+import 'package:spark_widgets/spark_dialog/spark_dialog.dart';
 
 import 'lib/ace.dart';
 import 'lib/actions.dart';
@@ -214,7 +215,7 @@ abstract class Spark
   Element getDialogElement(String selectors) =>
       document.querySelector(selectors);
 
-  SparkDialog createDialog(Element dialogElement);
+  Dialog createDialog(Element dialogElement);
 
   //
   // Parts of init():
@@ -481,7 +482,7 @@ abstract class Spark
     statusComponent.temporaryMessage = message;
   }
 
-  SparkDialog _errorDialog;
+  Dialog _errorDialog;
 
   void showMessage(String title, String message) {
     showErrorMessage(title, message);
@@ -506,13 +507,14 @@ abstract class Spark
    * Show a model error dialog.
    */
   void showErrorMessage(String title, String message) {
+    // TODO(ussuri): Polymerize.
     if (_errorDialog == null) {
       _errorDialog = createDialog(getDialogElement('#errorDialog'));
-      _errorDialog.element.querySelector("[primary]").onClick.listen(_hideBackdropOnClick);
+      _errorDialog.getElement("[primary]").onClick.listen(_hideBackdropOnClick);
     }
 
-    _errorDialog.element.querySelector('#errorTitle').text = title;
-    Element container = _errorDialog.element.querySelector('#errorMessage');
+    _errorDialog.getElement('#errorTitle').text = title;
+    Element container = _errorDialog.getElement('#errorMessage');
     container.children.clear();
     var lines = message.split('\n');
     for(String line in lines) {
@@ -524,7 +526,7 @@ abstract class Spark
     _errorDialog.show();
   }
 
-  SparkDialog _progressDialog;
+  Dialog _progressDialog;
 
   void showProgressDialog(String selector) {
     _progressDialog = createDialog(getDialogElement('${selector}'));
@@ -540,13 +542,17 @@ abstract class Spark
     querySelector("#modalBackdrop").style.display = "none";
   }
 
-  SparkDialog _publishedAppDialog;
+  Dialog _publishedAppDialog;
 
   void showPublishedAppDialog(String appID) {
+    // TODO(ussuri): Polymerize.
     if (_publishedAppDialog == null) {
-      _publishedAppDialog = createDialog(getDialogElement('#webStorePublishedDialog'));
-      _publishedAppDialog.element.querySelector("[primary]").onClick.listen(_hideBackdropOnClick);
-      _publishedAppDialog.element.querySelector("#webStorePublishedAction").onClick.listen((MouseEvent event) {
+      _publishedAppDialog =
+          createDialog(getDialogElement('#webStorePublishedDialog'));
+      _publishedAppDialog.getElement("[primary]")
+          .onClick.listen(_hideBackdropOnClick);
+      _publishedAppDialog.getElement("#webStorePublishedAction")
+          .onClick.listen((MouseEvent event) {
         window.open('https://chrome.google.com/webstore/detail/${appID}',
             '_blank');
         _hideBackdropOnClick(event);
@@ -555,13 +561,17 @@ abstract class Spark
     _publishedAppDialog.show();
   }
 
-  SparkDialog _uploadedAppDialog;
+  Dialog _uploadedAppDialog;
 
   void showUploadedAppDialog(String appID) {
+    // TODO(ussuri): Polymerize.
     if (_uploadedAppDialog == null) {
-      _uploadedAppDialog = createDialog(getDialogElement('#webStoreUploadedDialog'));
-      _uploadedAppDialog.element.querySelector("[primary]").onClick.listen(_hideBackdropOnClick);
-      _uploadedAppDialog.element.querySelector("#webStoreUploadedAction").onClick.listen((MouseEvent event) {
+      _uploadedAppDialog = createDialog(
+          getDialogElement('#webStoreUploadedDialog'));
+      _uploadedAppDialog.getElement("[primary]")
+          .onClick.listen(_hideBackdropOnClick);
+      _uploadedAppDialog.getElement("#webStoreUploadedAction")
+          .onClick.listen((MouseEvent event) {
         window.open('https://chrome.google.com/webstore/developer/edit/${appID}',
             '_blank');
         _hideBackdropOnClick(event);
@@ -570,19 +580,20 @@ abstract class Spark
     _uploadedAppDialog.show();
   }
 
-  SparkDialog _okCancelDialog;
+  Dialog _okCancelDialog;
   Completer<bool> _okCancelCompleter;
 
   Future<bool> askUserOkCancel(String message, {String okButtonLabel: 'OK'}) {
+    // TODO(ussuri): Polymerize.
     if (_okCancelDialog == null) {
       _okCancelDialog = createDialog(getDialogElement('#okCancelDialog'));
-      _okCancelDialog.element.querySelector('#okText').onClick.listen((_) {
+      _okCancelDialog.getElement('#okText').onClick.listen((_) {
         if (_okCancelCompleter != null) {
           _okCancelCompleter.complete(true);
           _okCancelCompleter = null;
         }
       });
-      _okCancelDialog.element.on['opened'].listen((event) {
+      _okCancelDialog.dialog.on['opened'].listen((event) {
         if (event.detail == false) {
           if (_okCancelCompleter != null) {
             _okCancelCompleter.complete(false);
@@ -592,9 +603,10 @@ abstract class Spark
       });
     }
 
-    _okCancelDialog.element.querySelector('#okCancelMessage').text = message;
-    _okCancelDialog.element.querySelector('#okText').text = okButtonLabel;
+    _okCancelDialog.getElement('#okCancelMessage').text = message;
+    _okCancelDialog.getElement('#okText').text = okButtonLabel;
 
+    // TODO(ussuri): Why is a completer used here?
     _okCancelCompleter = new Completer();
     _okCancelDialog.show();
     return _okCancelCompleter.future;
@@ -1007,14 +1019,17 @@ abstract class SparkAction extends Action {
   }
 }
 
-abstract class SparkDialog {
+abstract class Dialog {
   void show();
   void hide();
-  Element get element;
+  SparkDialog get dialog;
+  Element getElement(String selectors);
+  List<Element> getElements(String selectors);
+  Element getShadowDomElement(String selectors);
 }
 
 abstract class SparkActionWithDialog extends SparkAction {
-  SparkDialog _dialog;
+  Dialog _dialog;
 
   SparkActionWithDialog(Spark spark,
                         String id,
@@ -1022,19 +1037,27 @@ abstract class SparkActionWithDialog extends SparkAction {
                         Element dialogElement)
       : super(spark, id, name) {
     _dialog = spark.createDialog(dialogElement);
-    _dialog.element.querySelector("[primary]").onClick.listen((_) => _commit());
+    final Element primaryBtn = _dialog.getShadowDomElement("[primary]");
+    if (primaryBtn != null) {
+      primaryBtn.onClick.listen((_) => _commit());
+    }
+    // TODO(ussuri): This is used by just one dialog. Can do without?
+    final Element cancelBtn = _dialog.getShadowDomElement("[cancel]");
+    if (cancelBtn != null) {
+      cancelBtn.onClick.listen((_) => _cancel());
+    }
   }
 
-  void _commit() { }
+  void _commit() {}
 
-  Element getElement(String selectors) =>
-      _dialog.element.querySelector(selectors);
+  void _cancel() {}
 
-  List<Element> getElements(String selectors) =>
-      _dialog.element.querySelectorAll(selectors);
+  Element getElement(String selectors) => _dialog.getElement(selectors);
+
+  List<Element> getElements(String selectors) => _dialog.getElements(selectors);
 
   Element _triggerOnReturn(String selectors) {
-    var element = _dialog.element.querySelector(selectors);
+    var element = _dialog.getElement(selectors);
     element.onKeyDown.listen((event) {
       if (event.keyCode == KeyCode.ENTER) {
         _commit();
@@ -1825,28 +1848,26 @@ class _HarnessPushJob extends Job {
 
 class PropertiesAction extends SparkActionWithDialog implements ContextAction {
   ws.Resource _selectedResource;
-  Element _titleElement;
   HtmlElement _propertiesElement;
 
   PropertiesAction(Spark spark, Element dialog)
       : super(spark, 'properties', 'Properties…', dialog) {
-    _titleElement = getElement('#propertiesDialog .modal-title');
-    _propertiesElement = getElement('#propertiesDialog .modal-body');
+    _propertiesElement = _dialog.getShadowDomElement('.modal-body');
   }
 
   void _invoke([List context]) {
     _selectedResource = context.first;
     final String type = _selectedResource is ws.Project ? 'Project' :
       _selectedResource is ws.Container ? 'Folder' : 'File';
-    _titleElement.text = '${type} Properties';
+    _dialog.dialog.title = '${type} Properties';
     _propertiesElement.innerHtml = '';
     _buildProperties().then((_) => _show());
   }
 
   Future _buildProperties() {
-    _addProperty(_propertiesElement, 'Name', _selectedResource.name);
+    _addProperty('Name', _selectedResource.name);
     return _getLocation().then((location) {
-      _addProperty(_propertiesElement, 'Location', location);
+      _addProperty('Location', location);
     }).then((_) {
       GitScmProjectOperations gitOperations =
           spark.scmManager.getScmOperationsFor(_selectedResource.project);
@@ -1854,9 +1875,9 @@ class PropertiesAction extends SparkActionWithDialog implements ContextAction {
       if (gitOperations != null) {
         return gitOperations.getConfigMap().then((Map<String, dynamic> map) {
           final String repoUrl = map['url'];
-          _addProperty(_propertiesElement, 'Repository', repoUrl);
+          _addProperty('Repository', repoUrl);
         }).catchError((e) {
-          _addProperty(_propertiesElement, 'Repository',
+          _addProperty('Repository',
               '<error retrieving Git data>');
         });
       }
@@ -1864,12 +1885,12 @@ class PropertiesAction extends SparkActionWithDialog implements ContextAction {
       return _selectedResource.entry.getMetadata().then((meta) {
         if (_selectedResource.entry is FileEntry) {
           final String size = _nf.format(meta.size);
-          _addProperty(_propertiesElement, 'Size', '$size bytes');
+          _addProperty('Size', '$size bytes');
         }
 
         final String lastModified =
             new DateFormat.yMMMd().add_jms().format(meta.modificationTime);
-        _addProperty(_propertiesElement, 'Last Modified', lastModified);
+        _addProperty('Last Modified', lastModified);
       });
     });
   }
@@ -1882,9 +1903,10 @@ class PropertiesAction extends SparkActionWithDialog implements ContextAction {
     });
   }
 
-  void _addProperty(HtmlElement parent, String key, String value) {
+  void _addProperty(String key, String value) {
+    // TODO(ussuri): Polymerize.
     Element div = new DivElement()..classes.add('form-group');
-    parent.children.add(div);
+    _propertiesElement.children.add(div);
 
     Element label = new LabelElement()..text = key;
     Element element = new ParagraphElement()..text = value
@@ -2205,7 +2227,7 @@ class GitPushAction extends SparkActionWithDialog implements ContextAction {
     if (_needsUsernamePassword) {
       Timer.run(() {
         // In a timer to let the previous dialog dismiss properly.
-        GitAuthenticationDialog.request(spark).then((info) {
+        GitAuthenticationAction.request(spark).then((info) {
           _gitUsername = info['username'];
           _gitPassword = info['password'];
           _push();
@@ -2806,17 +2828,16 @@ class _WebStorePublishJob extends Job {
 }
 
 // TODO: This does not need to extends SparkActionWithDialog - just dialog.
-class GitAuthenticationDialog extends SparkActionWithDialog {
+class GitAuthenticationAction extends SparkActionWithDialog {
   Completer completer;
-  static GitAuthenticationDialog _instance;
+  static GitAuthenticationAction _instance;
   bool _initialized = false;
 
-  GitAuthenticationDialog(spark, dialogElement)
+  GitAuthenticationAction(spark, dialogElement)
       : super(spark, "git-authentication", "Authenticate", dialogElement);
 
   void _invoke([Object context]) {
     if (!_initialized) {
-      _dialog.element.querySelector(".cancel-button").onClick.listen((_) => _cancel());
       _initialized = true;
     }
 
@@ -2842,7 +2863,7 @@ class GitAuthenticationDialog extends SparkActionWithDialog {
 
   static Future<Map> request(Spark spark) {
     if (_instance == null) {
-      _instance = new GitAuthenticationDialog(spark,
+      _instance = new GitAuthenticationAction(spark,
           spark.getDialogElement('#gitAuthenticationDialog'));
     }
     assert(_instance.completer == null);
