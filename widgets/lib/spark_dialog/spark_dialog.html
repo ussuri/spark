@@ -4,6 +4,7 @@
      All rights reserved. Use of this source code is governed by a BSD-style
      license that can be found in the LICENSE file. -->
 
+<link rel="import" href="../../../packages/spark_widgets/spark_button/spark_button.html">
 <link rel="import" href="../../../packages/spark_widgets/spark_modal/spark_modal.html">
 
 <polymer-element name="spark-dialog"
@@ -24,12 +25,19 @@
       </div>
 
       <div class="modal-footer">
-        <spark-button overlay-toggle data-dismiss="modal">
-          Cancel
-        </spark-button>
-        <spark-button overlay-toggle data-dismiss="modal" primary>
-          OK
-        </spark-button>
+        <template repeat="{{b in buttonProps}}">
+          <spark-button
+              id="{{firedEvent}}"
+              primary?={{b.primary}}
+              large?={{b.large}}
+              small?={{b.small}}
+              noPadding?={{b.noPadding}}
+              overlayToggle?={{b.overlayToggle}}
+              dataDismiss="{{b.dataDismiss}}"
+              focused?={{focused}}>
+            {{b.text}}
+          </spark-button>
+        </template>
       </div>
     </spark-modal>
   </template>
