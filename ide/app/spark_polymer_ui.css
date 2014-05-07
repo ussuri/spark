@@ -108,19 +108,6 @@ spark-dialog input:invalid {
   font-weight: bold;
 }
 
-#gitPushDialog .modal-body {
-  margin: 0;
-  padding: 0;
-}
-
-#gitPushDialog .form-group {
-  margin: 0;
-}
-
-#gitPushDialog .modal-footer {
-  margin: 0;
-}
-
 #gitCommitList {
   max-height: 250px;
   overflow: scroll;
@@ -169,10 +156,6 @@ spark-dialog input:invalid {
 
 .input-label input {
   flex: 1 1 auto;
-}
-
-#webStorePublishDialog label {
-  margin-left: 5px;
 }
 
 [selectableTxt] {
