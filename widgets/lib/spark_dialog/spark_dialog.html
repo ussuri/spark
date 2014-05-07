@@ -27,14 +27,14 @@
       <div class="modal-footer">
         <template repeat="{{b in buttonProps}}">
           <spark-button
-              id="{{firedEvent}}"
-              primary?={{b.primary}}
-              large?={{b.large}}
-              small?={{b.small}}
-              noPadding?={{b.noPadding}}
-              overlayToggle?={{b.overlayToggle}}
-              dataDismiss="{{b.dataDismiss}}"
-              focused?={{focused}}>
+              id="{{b.id}}"
+              primary?="{{b.primary}}"
+              large?="{{b.large}}"
+              small?="{{b.small}}"
+              noPadding?="{{b.noPadding}}"
+              overlay-toggle?="{{b.overlayToggle}}"
+              data-dismiss="{{b.dataDismiss}}"
+              focused?="{{b.focused}}">
             {{b.text}}
           </spark-button>
         </template>

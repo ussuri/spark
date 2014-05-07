@@ -25,8 +25,8 @@ class ButtonProps {
       'reset': 'Reset'
   };
 
+  String id = '';
   String text = '';
-  String firedEvent;
 
   bool primary = false;
   bool large = false;
@@ -34,22 +34,22 @@ class ButtonProps {
   bool noPadding = false;
   bool overlayToggle = false;
   String dataDismiss = '';
-  bool focused;
+  bool focused = false;
 
   ButtonProps.fromSpec(String spec) {
     final Match m = _SPEC_REGEXP.matchAsPrefix(spec.trim());
-    firedEvent = m[1];
+    id = m[1];
     text = m[2];
     if (text == null) {
-      text = _STANDARD_BUTTONS[firedEvent];
+      text = _STANDARD_BUTTONS[id];
     }
-    if (firedEvent == 'ok' || firedEvent == 'cancel') {
+    if (id == 'ok' || id == 'cancel') {
       overlayToggle = true;
-      if (firedEvent == 'ok') {
+      if (id == 'ok') {
         primary = true;
       }
     }
-    // Note that explicit attributes take precedence over the defaults above.
+    // Note that explicit attributes take precedence over the id-based defaults.
     if (m[3] != null) {
       final List<String> attrs = m[3].split(' ');
       for (final attr in attrs) {
@@ -60,8 +60,8 @@ class ButtonProps {
           case 'small': small = true; break;
           case 'noPadding': noPadding = true; break;
           case 'focused': focused = true; break;
-          case 'overlay-toggle': overlayToggle = true; break;
-          default: assert(false);
+          case 'closeDialog': overlayToggle = true; break;
+          default: throw new StateError("Unknown button spec attribute '$attr'");
         }
       }
     }
@@ -79,8 +79,8 @@ class SparkDialog extends SparkWidget {
   @published String title = '';
 
   /**
-   * Specially formatted specification of buttons and their roles that the
-   * dialog should display.
+   * Specification of the buttons that the dialog should display and their
+   * actions and properties.
    */
   @published String buttons = 'cancel;ok';
 
