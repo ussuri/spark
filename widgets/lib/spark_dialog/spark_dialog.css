@@ -35,12 +35,26 @@
 }
 
 ::content * {
+  box-sizing: border-box;
   font-family: Arial, Helvetica, sans-serif;
   font-size: 13px;
-  overflow: hidden;
   -webkit-user-select: none;
+}
+
+::content label {
+  margin-left: 5px;
+  vertical-align: text-top;
 }
 
 ::content input {
   -webkit-user-select: text;
+}
+
+::content input[type=radio] {
+  margin-left: 2px;
+}
+
+::content input[type=text] {
+  margin: 2px;
+  font-size: 14px;
 }
