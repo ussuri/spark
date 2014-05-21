@@ -219,16 +219,22 @@ abstract class Spark
    * is overwritten in SparkPolymer, which encapsulates the UI in a top-level
    * Polymer widget, rather than the top-level document's DOM.
    */
-  Element getUIElement(String selectors) =>
-      document.querySelector(selectors);
+  Element getUIElement(String selectors) {
+    final Element elt = document.querySelector(selectors);
+    assert(elt != null);
+    return elt;
+  }
 
   /**
    * Should extract a dialog Element from the underlying UI's DOM. This is
    * different from [getUIElement] in that it's not currently overridden in
    * SparkPolymer.
    */
-  Element getDialogElement(String selectors) =>
-      document.querySelector(selectors);
+  Element getDialogElement(String selectors) {
+    final Element elt = document.querySelector(selectors);
+    assert(elt != null);
+    return elt;
+  }
 
   Dialog createDialog(Element dialogElement);
 
@@ -413,7 +419,7 @@ abstract class Spark
     actionManager.registerAction(new BowerGetAction(this));
     actionManager.registerAction(new BowerUpgradeAction(this));
     actionManager.registerAction(new ApplicationRunAction(this));
-    actionManager.registerAction(new DeployToMobileAction(this, getDialogElement('#mobileDeployDialog')));
+    actionManager.registerAction(new ApplicationPushAction(this, getDialogElement('#pushDialog')));
     actionManager.registerAction(new CompileDartAction(this));
     actionManager.registerAction(new GitCloneAction(this, getDialogElement("#gitCloneDialog")));
     if (SparkFlags.showGitPull) {
@@ -454,8 +460,6 @@ abstract class Spark
     actionManager.registerAction(new GotoDeclarationAction(this));
     actionManager.registerAction(new HistoryAction.back(this));
     actionManager.registerAction(new HistoryAction.forward(this));
-    actionManager.registerAction(new ToggleOutlineVisibilityAction(this));
-    actionManager.registerAction(new SendFeedbackAction(this));
 
     actionManager.registerKeyListener();
   }
@@ -1272,6 +1276,7 @@ class FileDeleteAction extends SparkAction implements ContextAction {
       !_hasTopLevelResource(object);
 }
 
+// TODO(ussuri): Convert to SparkActionWithDialog.
 class ProjectRemoveAction extends SparkAction implements ContextAction {
   ProjectRemoveAction(Spark spark) : super(spark, "project-remove", "Remove");
 
@@ -1284,14 +1289,14 @@ class ProjectRemoveAction extends SparkAction implements ContextAction {
       return;
     }
 
-    SparkDialog _dialog =
+    Dialog _dialog =
         spark.createDialog(spark.getDialogElement('#projectRemoveDialog'));
-    _dialog.element.querySelector("#projectRemoveProjectName").text =
+    _dialog.getElement("#name").text =
         project.name;
-    _dialog.element.querySelector("#projectRemoveDeleteButton")
-        .onClick.listen((_) => _deleteProject(project));
-    _dialog.element.querySelector("#projectRemoveRemoveReferenceButton")
-        .onClick.listen((_) => _removeProjectReference(project));
+    _dialog.getElement("#delete").onClick.listen((_) =>
+        _deleteProject(project));
+    _dialog.getElement("#remove").onClick.listen((_) =>
+        _removeProjectReference(project));
     _dialog.show();
   }
 
@@ -1319,20 +1324,22 @@ This will permanently delete the project contents from disk and cannot be undone
   bool appliesTo(Object object) => _isProject(object);
 }
 
+// TODO(ussuri): 1) Convert to SparkActionWithDialog. This dialog is almost
+// the same as ProjectRemoveAction: combine.
 class TopLevelFileRemoveAction extends SparkAction implements ContextAction {
   TopLevelFileRemoveAction(Spark spark) : super(spark, "top-level-file-remove", "Remove");
 
   void _invoke([List<ws.Resource> resources]) {
     ws.File file = resources.first;
 
-    SparkDialog _dialog =
+    Dialog _dialog =
         spark.createDialog(spark.getDialogElement('#fileRemoveDialog'));
-    _dialog.element.querySelector("#fileRemoveFileName").text =
+    _dialog.getElement("#name").text =
         file.name;
-    _dialog.element.querySelector("#fileRemoveDeleteButton")
-        .onClick.listen((_) => _deleteFile(file));
-    _dialog.element.querySelector("#fileRemoveRemoveReferenceButton")
-        .onClick.listen((_) => _removeFileReference(file));
+    _dialog.getElement("#delete").onClick.listen((_) =>
+        _deleteFile(file));
+    _dialog.getElement("#remove").onClick.listen((_) =>
+        _removeFileReference(file));
     _dialog.show();
   }
 
@@ -1951,20 +1958,15 @@ class FolderOpenAction extends SparkAction {
   }
 }
 
-class DeployToMobileAction extends SparkActionWithDialog implements ContextAction {
+class ApplicationPushAction extends SparkActionWithDialog implements ContextAction {
   InputElement _pushUrlElement;
   ws.Container deployContainer;
 
-  DeployToMobileAction(Spark spark, Element dialog)
+  ApplicationPushAction(Spark spark, Element dialog)
       : super(spark, "application-push", "Deploy to Mobile", dialog) {
     _pushUrlElement = _triggerOnReturn("#pushUrl");
     enabled = false;
     spark.focusManager.onResourceChange.listen((r) => _updateEnablement(r));
-
-    // When the IP address field is selected, check the `IP` checkbox.
-    getElement('#pushUrl').onFocus.listen((e) {
-      (getElement('#ip') as InputElement).checked = true;
-    });
   }
 
   void _invoke([context]) {

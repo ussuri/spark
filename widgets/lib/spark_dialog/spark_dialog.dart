@@ -87,7 +87,7 @@ class SparkDialog extends SparkWidget {
   /**
    * The kind of animation that the overlay should perform on open/close.
    */
-  @published String animation = '';
+  @published String animation = 'scale-slideup';
 
   @observable final buttonProps = new ObservableList<ButtonProps>();
 
