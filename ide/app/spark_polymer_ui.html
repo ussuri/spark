@@ -608,23 +608,18 @@
       </div>
     </spark-modal>
 
-    <!-- project remove dialog -->
-    <spark-modal id="projectRemoveDialog" class="dialog" animation="scale-slideup">
-      <div class="modal-header">
-        <a href="#" class="close" overlay-toggle>&times;</a>
-        <h4 class="modal-title">Remove Project</h4>
+    <!-- Project remove dialog -->
+    <spark-dialog id="projectRemoveDialog"
+        title="Remove Project"
+        buttons="cancel;delete:Delete[closeDialog];remove:Remove Reference[closeDialor,primary,focused]"
+        animation="scale-slideup">
+      <div class="help-block">
+        Choose "Delete" if you want to remove
+        &quot;<span id="projectRemoveProjectName"></span>&quot; permanently from
+        disk or choose "Remove Reference" if you'd like to remove it from
+        the list of projects in Spark but keep your files on disk.
       </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <div class="help-block">
-            Choose "Delete" if you want to remove
-            &quot;<span id="projectRemoveProjectName"></span>&quot; permanently from
-            disk or choose "Remove Reference" if you'd like to remove it from
-            the list of projects in Spark but keep your files on disk.
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer">
+      <!--div class="modal-footer">
         <spark-button overlay-toggle data-dismiss="modal">
           Cancel
         </spark-button>
@@ -636,26 +631,21 @@
             id="projectRemoveRemoveReferenceButton">
           Remove Reference
         </spark-button>
-      </div>
+      </div-->
     </spark-modal>
 
-    <!-- file remove dialog -->
-    <spark-modal id="fileRemoveDialog" class="dialog" animation="scale-slideup">
-      <div class="modal-header">
-        <a href="#" class="close" overlay-toggle>&times;</a>
-        <h4 class="modal-title">Remove File</h4>
+    <!-- File remove dialog -->
+    <spark-dialog id="fileRemoveDialog"
+        title="Remove File"
+        buttons="cancel;delete:Delete[closeDialog];remove:Remove Reference[closeDialor,primary,focused]"
+        animation="scale-slideup">
+      <div class="help-block">
+        Choose "Delete" if you want to remove
+        &quot;<span id="fileRemoveFileName"></span>&quot; permanently from
+        disk or choose "Remove Reference" if you'd like to remove it from
+        Spark but keep the file on disk.
       </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <div class="help-block">
-            Choose "Delete" if you want to remove
-            &quot;<span id="fileRemoveFileName"></span>&quot; permanently from
-            disk or choose "Remove Reference" if you'd like to remove it from
-            Spark but keep the file on disk.
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer">
+      <!--div class="modal-footer">
         <spark-button overlay-toggle data-dismiss="modal">
           Cancel
         </spark-button>
@@ -667,7 +657,7 @@
             id="fileRemoveRemoveReferenceButton">
           Remove Reference
         </spark-button>
-      </div>
+      </div-->
     </spark-modal>
   </template>
 
