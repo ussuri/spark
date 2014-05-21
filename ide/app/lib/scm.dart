@@ -16,13 +16,15 @@ import 'package:logging/logging.dart';
 import 'package:observe/observe.dart';
 
 import 'builder.dart';
+import 'exception.dart';
 import 'jobs.dart';
 import 'workspace.dart';
 import 'git/config.dart';
-import 'git/http_fetcher.dart';
+import 'git/exception.dart';
 import 'git/objectstore.dart';
 import 'git/object.dart';
 import 'git/options.dart';
+import 'git/commands/add.dart';
 import 'git/commands/branch.dart';
 import 'git/commands/checkout.dart';
 import 'git/commands/clone.dart';
@@ -180,16 +182,6 @@ abstract class ScmProjectOperations {
   Future updateForChanges(List<ChangeDelta> changes);
 }
 
-// TODO: Remove this when we have a generic spark exception class.
-class ScmException implements Exception {
-  final String message;
-  final bool needsAuth;
-
-  ScmException(this.message, [this.needsAuth = false]);
-
-  String toString() => message;
-}
-
 /**
  * The possible SCM file statuses (`untracked`, `modified`, `staged`, or
  * `committed`).
@@ -200,6 +192,9 @@ class FileStatus {
   static const FileStatus STAGED = const FileStatus._('staged');
   static const FileStatus UNMERGED = const FileStatus._('unmerged');
   static const FileStatus COMMITTED = const FileStatus._('committed');
+  static const FileStatus DELETED = const FileStatus._('deleted');
+  static const FileStatus ADDED = const FileStatus._('added');
+
 
   final String status;
 
@@ -210,10 +205,14 @@ class FileStatus {
     if (value == 'modified') return FileStatus.MODIFIED;
     if (value == 'staged') return FileStatus.STAGED;
     if (value == 'unmerged') return FileStatus.UNMERGED;
+    if (value == 'deleted') return FileStatus.DELETED;
+    if (value == 'added') return FileStatus.ADDED;
     return FileStatus.UNTRACKED;
   }
 
   factory FileStatus.fromIndexStatus(String status) {
+    if (status == FileStatusType.DELETED) return FileStatus.DELETED;
+    if (status == FileStatusType.ADDED) return FileStatus.ADDED;
     if (status == FileStatusType.COMMITTED) return FileStatus.COMMITTED;
     if (status == FileStatusType.MODIFIED) return FileStatus.MODIFIED;
     if (status == FileStatusType.STAGED) return FileStatus.STAGED;
@@ -275,10 +274,10 @@ class GitScmProvider extends ScmProvider {
         return options.store.index.flush();
       });
     }).catchError((e) {
-      if (e is HttpResult) {
-        throw new ScmException(e.toString(), e.needsAuth);
+      if (e is GitException && e.errorCode == GitErrorConstants.GIT_AUTH_REQUIRED) {
+        throw new SparkException(e.toString(), SparkErrorConstants.AUTH_REQUIRED);
       } else {
-        throw new ScmException(e.toString());
+        throw new SparkException(e.toString());
       }
     });
   }
@@ -387,11 +386,26 @@ class GitScmProjectOperations extends ScmProjectOperations {
     });
   }
 
+  Future<List<FileStatus>> addFiles(List<chrome.Entry> files) {
+    return objectStore.then((store) {
+      GitOptions options = new GitOptions(root: entry, store: store);
+      return Add.addEntries(options, files).then((_) {
+        return _refreshStatus(project: project);
+      });
+    });
+  }
+
   Future push(String username, String password) {
     return objectStore.then((store) {
       GitOptions options = new GitOptions(root: entry, store: store,
           username: username, password: password);
       return Push.push(options);
+    });
+  }
+
+  Future<List<String>> getDeletedFiles() {
+    return objectStore.then((store) {
+      return Status.getDeletedFiles(store);
     });
   }
 
@@ -463,8 +477,20 @@ class GitScmProjectOperations extends ScmProjectOperations {
     return objectStore.then((ObjectStore store) {
       return Future.forEach(files, (File file) {
         return Status.getFileStatus(store, file.entry).then((status) {
+          String fileStatus;
+          if (status.type == FileStatusType.MODIFIED) {
+            if (status.deleted) {
+              fileStatus = FileStatusType.DELETED;
+            } else if (status.headSha == null) {
+              fileStatus = FileStatusType.ADDED;
+            } else {
+              fileStatus = FileStatusType.MODIFIED;
+            }
+          } else {
+            fileStatus = status.type;
+          }
           file.setMetadata('scmStatus',
-              new FileStatus.fromIndexStatus(status.type).status);
+              new FileStatus.fromIndexStatus(fileStatus).status);
         });
       }).then((_) => _statusController.add(this));
     }).catchError((e, st) {

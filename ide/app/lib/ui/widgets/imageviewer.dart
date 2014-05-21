@@ -52,6 +52,8 @@ class ImageViewer implements Editor {
     _loadFile();
   }
 
+  Future<Editor> get whenReady => new Future.value();
+
   _loadFile() {
     _image.onLoad.listen((_) => resize());
     _file.getBytes().then((chrome.ArrayBuffer content) {
@@ -208,7 +210,7 @@ class ImageViewer implements Editor {
   Stream get onDirtyChange => _dirtyController.stream;
   Stream get onModification => _dirtyController.stream;
   bool get dirty => false;
-  Future save([bool stripWhitespace = false]) {
+  Future save() {
     return new Future.value();
   }
 

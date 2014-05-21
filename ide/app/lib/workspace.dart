@@ -18,6 +18,7 @@ import 'package:logging/logging.dart';
 import 'builder.dart';
 import 'enum.dart';
 import 'jobs.dart';
+import 'package_mgmt/bower_properties.dart';
 import 'preferences.dart';
 import 'utils.dart';
 
@@ -178,7 +179,7 @@ class Workspace extends Container {
     });
   }
 
-  bool isSyncResource(Resource resource) {
+  bool _isSyncResource(Resource resource) {
     return _roots.any((root) => root is SyncFolderRoot && root.resource == resource);
   }
 
@@ -258,7 +259,7 @@ class Workspace extends Container {
         }).whenComplete(() {
           _logger.info('Workspace restore took ${stopwatch.elapsedMilliseconds}ms.');
           resumeResourceEvents();
-          //_restoreSyncFs();
+          _restoreSyncFs();
         }).then((_) => _whenAvailable.complete(this));
       } catch (e) {
         _logger.warning('Exception in workspace restore', e);
@@ -872,7 +873,8 @@ class Folder extends Container {
 
   bool isDerived() {
     // TODO(devoncarew): 'cache' is a temporay folder - it will be removed.
-    if ((name == 'build' || name == 'cache') && parent is Project) {
+    if ((name == 'build' || name == 'cache' || name == bowerProperties.packagesDirName) &&
+        parent is Project) {
       return true;
     } else {
       return super.isDerived();
@@ -1058,9 +1060,12 @@ class Project extends Folder {
 
   String get uuid => '${_root.id}';
 
+  bool isSyncResource() => workspace._isSyncResource(this);
+
   Future refresh() {
     // Only allow one refresh call at a time.
-    assert(_inRefresh == false);
+    if (_inRefresh) return new Future.value();
+
     _inRefresh = true;
 
     workspace.pauseResourceEvents();

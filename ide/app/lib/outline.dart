@@ -25,6 +25,8 @@ class Outline {
   html.UListElement _rootList;
 
   html.ButtonElement _outlineButton;
+  html.SpanElement _scrollTarget;
+  int _initialScrollPosition = 0;
 
   final PreferenceStore _prefs;
   bool _visible = true;
@@ -48,7 +50,7 @@ class Outline {
         html.TemplateElement).content;
     templateClone = template.clone(true);
     _outlineButton = templateClone.querySelector('#toggleOutlineButton');
-    _outlineButton.onClick.listen((e) => _toggle());
+    _outlineButton.onClick.listen((e) => toggle());
 
     _container.children.add(_outlineButton);
     _prefs.getValue('OutlineCollapsed').then((String data) {
@@ -60,6 +62,24 @@ class Outline {
   }
 
   Stream<OutlineItem> get onChildSelected => _childSelectedController.stream;
+
+  Stream get onScroll => _outlineDiv.onScroll;
+
+  int get scrollPosition => _rootList.parent.scrollTop;
+  void set scrollPosition(int position) {
+    // If the outline has not been built yet, just save the position
+    _initialScrollPosition = position;
+    if (_scrollTarget != null) {
+      // Hack for scrollTop not working
+      _scrollTarget.hidden = false;
+      _scrollTarget.style
+          ..position = "absolute"
+          ..height = "${_outlineDiv.clientHeight}px"
+          ..top = "${position}px";
+      _scrollTarget.scrollIntoView();
+      _scrollTarget.hidden = true;
+    }
+  }
 
   bool get visible => !_outlineDiv.classes.contains('collapsed');
   set visible(bool value) {
@@ -94,10 +114,15 @@ class Outline {
   void _populate(services.Outline outline) {
     _outlineItemsByOffset = {};
     _rootList.children.clear();
+    _scrollTarget = new html.SpanElement();
+    _rootList.append(_scrollTarget);
+
     for (services.OutlineTopLevelEntry data in outline.entries) {
       OutlineItem item = _create(data);
       _outlineItemsByOffset[item.bodyStartOffset] = item;
     }
+
+    if (_initialScrollPosition != null) scrollPosition = _initialScrollPosition;
   }
 
   OutlineTopLevelItem _create(services.OutlineTopLevelEntry data) {
@@ -113,9 +138,9 @@ class Outline {
   }
 
   /**
-   * Toggles visibility of the outline.  Returns true if showing.
+   * Toggles visibility of the outline.
    */
-  void _toggle() {
+  void toggle() {
     _outlineDiv.classes.toggle('collapsed');
     String value = _outlineDiv.classes.contains('collapsed') ? 'true' : 'false';
     _prefs.setValue('OutlineCollapsed', value);

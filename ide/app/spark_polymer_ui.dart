@@ -8,6 +8,7 @@ import 'dart:html';
 
 import 'package:polymer/polymer.dart';
 import 'package:spark_widgets/common/spark_widget.dart';
+import 'package:spark_widgets/spark_split_view/spark_split_view.dart';
 
 import 'spark_flags.dart';
 import 'spark_model.dart';
@@ -19,17 +20,25 @@ import 'lib/platform_info.dart';
 class SparkPolymerUI extends SparkWidget {
   SparkModel _model;
 
-  // NOTE: The initial values have to be true so the app can find all the
-  // UI elements it theoretically could need.
+  @published int splitViewPosition;
+
+  // NOTE: The initial values for these have to be true, because the app
+  // uses querySelector to find the affected elements that would be not
+  // rendered if these were false.
   @observable bool developerMode = true;
   @observable bool useAceThemes = true;
+  @observable bool showWipProjectTemplates = true;
   @observable bool chromeOS = true;
+
+  SparkSplitView _splitView;
 
   SparkPolymerUI.created() : super.created();
 
   @override
   void enteredView() {
     super.enteredView();
+
+    _splitView = $['splitView'];
   }
 
   void modelReady(SparkModel model) {
@@ -48,7 +57,20 @@ class SparkPolymerUI extends SparkWidget {
     // TODO(ussuri): This also could possibly be done using PathObservers.
     developerMode = SparkFlags.developerMode;
     useAceThemes = SparkFlags.useAceThemes;
+    showWipProjectTemplates = SparkFlags.showWipProjectTemplates;
     chromeOS = PlatformInfo.isCros;
+
+    // This propagates external changes down to the enclosed widgets.
+    Observable.dirtyCheck();
+  }
+
+  void splitViewPositionChanged() {
+    // TODO(ussuri): In deployed code, this was critical for correct
+    // propagation of the client's changes in [splitViewPosition] to _splitView.
+    // Investigate.
+    if (IS_DART2JS) {
+      _splitView..targetSize = splitViewPosition..targetSizeChanged();
+    }
   }
 
   void onMenuSelected(CustomEvent event, var detail) {
@@ -73,6 +95,16 @@ class SparkPolymerUI extends SparkWidget {
 
   void onKeysPlus(Event e) {
     _model.aceKeysManager.inc(e);
+  }
+
+  void onFontSmaller(Event e) {
+    e.stopPropagation();
+    _model.aceFontManager.dec();
+  }
+
+  void onFontLarger(Event e) {
+    e.stopPropagation();
+    _model.aceFontManager.inc();
   }
 
   void onSplitterUpdate(CustomEvent e, var detail) {

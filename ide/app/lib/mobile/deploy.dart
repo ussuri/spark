@@ -2,18 +2,25 @@
 // All rights reserved. Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+/**
+ * A library to deploy a chrome app to an Android device.
+ */
 library spark.deploy;
 
 import 'dart:async';
 
 import 'package:chrome/chrome_app.dart' as chrome;
+import 'package:logging/logging.dart';
 
 import 'adb.dart';
+import 'adb_client_tcp.dart';
 import '../jobs.dart';
 import '../preferences.dart';
 import '../tcp.dart';
 import '../workspace.dart';
 import '../workspace_utils.dart';
+
+Logger _logger = new Logger('spark.deploy');
 
 class DeviceInfo {
   final int vendorId;
@@ -25,13 +32,12 @@ class DeviceInfo {
   DeviceInfo(this.vendorId, this.productId, this.description);
 }
 
-class HarnessPush {
-  static final int ADB_PORT = 5037;
+class MobileDeploy {
   final Container appContainer;
   final PreferenceStore _prefs;
   List<DeviceInfo> _knownDevices = [];
 
-  HarnessPush(this.appContainer, this._prefs) {
+  MobileDeploy(this.appContainer, this._prefs) {
     if (appContainer == null) {
       throw new ArgumentError('must provide an app to push');
     }
@@ -46,6 +52,53 @@ class HarnessPush {
         }
       }
     }
+  }
+
+  /**
+   * Packages (a subdirectory of) the current project, and sends it via HTTP to
+   * a remote host.
+   *
+   * It expects the target host, and a [ProgressMonitor] for 10 units of work.
+   * All files under the project will be added to a (slightly broken, see
+   * below) CRX file, and sent via HTTP POST to the target host, using the /push
+   * protocol described [here](https://github.com/MobileChromeApps/harness-push).
+   *
+   *     MobileDeploy.pushToHost('192.168.1.121', monitor);
+   *
+   * Returns a Future for the push operation.
+   *
+   * Important Note: The CRX file that gets created and pushed is not correctly
+   * signed and does not include the application's key. Since the target of a
+   * push is intended to be a tool like the
+   * [Chrome ADT](https://github.com/MobileChromeApps/harness) on Android,
+   * and that tool doesn't care about the CRX metadata, this is not a problem.
+   */
+  Future pushToHost(String target, ProgressMonitor monitor) {
+    monitor.start('Deploying…', 10);
+
+    _logger.info('deploying application to ip host');
+
+    return _sendHttpPush(target, monitor);
+  }
+
+  /**
+   * Push the application via ADB. We try connecting to a local ADB server
+   * first. If that fails, then we try pushing via a USB connection.
+   */
+  Future pushAdb(ProgressMonitor monitor) {
+    monitor.start('Deploying…', 10);
+
+    // Try to find a local ADB server. If we fail, try to use USB.
+    return AdbClientTcp.createClient().then((AdbClientTcp client) {
+      _logger.info('deploying application via adb server');
+
+      return _pushToAdbServer(client, monitor);
+    }, onError: (_) {
+      _logger.info('deploying application via ADB over USB');
+
+      // No server found, so use our own USB code.
+      return _pushViaUSB(monitor);
+    });
   }
 
   List<int> _buildHttpRequest(String target, List<int> payload) {
@@ -88,31 +141,6 @@ class HarnessPush {
     httpRequest.addAll(body);
 
     return httpRequest;
-  }
-
-  /**
-   * Packages (a subdirectory of) the current project, and sends it via HTTP to
-   * a remote host.
-   *
-   * It expects the target host, and a [ProgressMonitor] for 10 units of work.
-   * All files under the project will be added to a (slightly broken, see
-   * below) CRX file, and sent via HTTP POST to the target host, using the /push
-   * protocol described [here](https://github.com/MobileChromeApps/harness-push).
-   *
-   *     HarnessPush.push('192.168.1.121', monitor);
-   *
-   * Returns a Future for the push operation.
-   *
-   * Important Note: The CRX file that gets created and pushed is not correctly
-   * signed and does not include the application's key. Since the target of a
-   * push is intended to be a tool like the
-   * [Chrome ADT](https://github.com/MobileChromeApps/harness) on Android,
-   * and that tool doesn't care about the CRX metadata, this is not a problem.
-   */
-  Future pushToHost(String target, ProgressMonitor monitor) {
-    monitor.start('Deploying…', 10);
-
-    return _sendHttpPush(target, monitor);
   }
 
   Future _sendHttpPush(String target, ProgressMonitor monitor) {
@@ -182,78 +210,20 @@ class HarnessPush {
     }).then((_) => device);
   }
 
-  Future pushAdb(ProgressMonitor monitor) {
-    monitor.start('Deploying…', 10);
+  Future _pushToAdbServer(AdbClientTcp client, ProgressMonitor monitor) {
+//  // Start ADT on the device.
+//  return client.startActivity(AdbApplication.CHROME_ADT);
 
-    // Try to find a local ADB server. If we fail, try to use USB.
-    return _connectToAdbServer().then((client) {
-      return _pushToAdbServer(client, monitor);
-    }, onError: (_) { // No server found, so use our own USB code.
-      return _pushViaUSB(monitor);
+    client.getDevices();
+
+    // Setup port forwarding to 2424 on the device.
+    return client.forwardTcp(2424, 2424).then((_) {
+      // TODO: a SocketException, code == -100 here often means that Chrome ADT
+      // is not running on the device.
+      // Push the app binary to port 2424.
+      return _sendHttpPush('127.0.0.1', monitor);
     });
   }
-
-  Future<TcpClient> _connectToAdbServer() {
-    // Try to connect to localhost:5037.
-    return TcpClient.createClient(LOCAL_HOST, HarnessPush.ADB_PORT);
-  }
-
-  void _sendAdbCommand(TcpClient client, String msg) {
-    // ADB expects a four-character ASCII hex string at the start of a message.
-    // The value is the length of the rest of the message.
-    String lenStr = msg.length.toRadixString(16);
-    String padded = "0000".substring(lenStr.length);
-    String payload = '${padded}${lenStr}${msg}';
-    client.writeString(payload);
-  }
-
-  Future _pushToAdbServer(TcpClient client, ProgressMonitor monitor) {
-    Stream<List<int>> stream = client.stream;
-
-    // First, check how many devices there are connected.
-    _sendAdbCommand(client, 'host:devices');
-
-    return stream.take(1).single.then((List<int> deviceBytes) {
-      String deviceList = new String.fromCharCodes(deviceBytes);
-      if (!deviceList.startsWith('OKAY')) {
-        return new Future.error('Invalid response to device list request');
-      }
-
-      // Drop the OKAY and four-character hex length off the beginning,
-      // and then split on newlines. Each line is a device description.
-      // Remove any trailing newline first.
-      if (deviceList.endsWith('\n')) {
-        deviceList = deviceList.substring(0, deviceList.length-2);
-      }
-      List<String> devices = deviceList.substring(8).split('\n');
-      List<List<String>> deviceDetails = new List.from(
-          devices.map((d) => d.split('\t')));
-
-      // deviceDetails has one row for each device, and each device has two
-      // columns: [0] is the serial number, [1] is the description.
-      // TODO: Handle > 1 device!
-      if (deviceDetails.length < 1) {
-        return new Future.error(
-            'Connected to ADB server, but there are no devices attached.');
-      } else if (deviceDetails.length > 1) {
-        return new Future.error(
-            'Connect to ADB server, but there are multiple devices attached. FIXME TODO');
-      } else {
-        // The working case of exactly one device. We send a forwarding request
-        // to the server.
-        // Have to reconnect, these connections are single-use.
-        return _connectToAdbServer().then((TcpClient client) {
-          _sendAdbCommand(client,
-              'host-serial:${ deviceDetails[0][0] }:forward:tcp:2424;tcp:2424');
-          return _sendHttpPush('127.0.0.1', monitor);
-        });
-      }
-    }, onError: (e) {
-      return new Future.error(
-          'Error reading response from ADB server: ' + e);
-    });
-  }
-
 
   Future _pushViaUSB(ProgressMonitor monitor) {
     List<int> httpRequest;

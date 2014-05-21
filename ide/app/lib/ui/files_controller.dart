@@ -194,7 +194,10 @@ class FilesController implements TreeViewDelegate {
 
   ListViewCell treeViewCellForNode(TreeView view, String nodeUid) {
     Resource resource = _filesMap[nodeUid];
-    assert(resource != null);
+    if (resource == null) {
+      print('no resource for ${nodeUid}');
+      assert(resource != null);
+    }
     FileItemCell cell = new FileItemCell(resource);
     if (resource is Folder) {
       cell.acceptDrop = true;
@@ -203,7 +206,10 @@ class FilesController implements TreeViewDelegate {
     return cell;
   }
 
-  int treeViewHeightForNode(TreeView view, String nodeUid) => 20;
+  int treeViewHeightForNode(TreeView view, String nodeUid) {
+    Resource resource = _filesMap[nodeUid];
+    return resource is Project ? 40 : 20;
+  }
 
   void treeViewSelectedChanged(TreeView view, List<String> nodeUids) {
     if (nodeUids.isNotEmpty) {
@@ -579,6 +585,23 @@ class FilesController implements TreeViewDelegate {
         JSON.encode(_treeView.expandedState));
   }
 
+  html.Element treeViewSeparatorForNode(TreeView view, String nodeUid) {
+    Resource resource = _filesMap[nodeUid];
+    if (resource is! Project) return null;
+    if (_files.length == 0) return null;
+
+    // Don't show a separator before the first item.
+    if (_files[0] == resource) return null;
+
+    html.DocumentFragment template =
+        (html.querySelector('#fileview-separator') as html.TemplateElement)
+        .content;
+    html.DocumentFragment templateClone = template.clone(true);
+    return templateClone.querySelector('.fileview-separator');
+  }
+
+  int treeViewSeparatorHeightForNode(TreeView view, String nodeUid) => 25;
+
   // Cache management for sorted list of resources.
 
   void _cacheChildren(String nodeUid) {
@@ -657,42 +680,53 @@ class FilesController implements TreeViewDelegate {
    * Event handler for workspace events.
    */
   void _processEvents(ResourceChangeEvent event) {
+    bool needsReloadData = false;
+    bool needsSortTopLevel = false;
+    bool needsUpdateExpandedState = false;
+    bool needsUpdateSelection = false;
+    List<String> updatedSelection = new List.from(_treeView.selection);
+    List<String> updatedExpanded = new List.from(_treeView.expandedState);
+
     event.changes.where((d) => _showResource(d.resource))
         .forEach((ChangeDelta change) {
       if (change.type == EventType.ADD) {
         var resource = change.resource;
         if (resource.isTopLevel) {
           _files.add(resource);
-          _sortTopLevel();
+          needsSortTopLevel = true;
         }
         _filesMap[resource.uuid] = resource;
-        _reloadData();
+        needsReloadData = true;
       } else if (change.type == EventType.DELETE) {
         var resource = change.resource;
         if (resource.isTopLevel) {
           _files.remove(resource);
-          _sortTopLevel();
+          needsSortTopLevel = true;
         }
         _filesMap.remove(resource.uuid);
-        _reloadData();
+        needsReloadData = true;
       } else if (change.type == EventType.RENAME) {
-        // Update expanded state of tree view.
-        List<String> expanded = _treeView.expandedState;
-        List<String> updatedExpanded = [];
-        for(String uuid in expanded) {
+        // Update expanded state of the tree view.
+        List<String> expanded = [];
+        for(String uuid in updatedExpanded) {
           String newUuid = change.resourceUuidsMapping[uuid];
           if (newUuid != null) {
-            updatedExpanded.add(newUuid);
+            expanded.add(newUuid);
           } else {
-            updatedExpanded.add(uuid);
+            expanded.add(uuid);
           }
         }
+        updatedExpanded = expanded;
+        needsUpdateExpandedState = true;
+        // Update the selection of the tree view.
+        updatedSelection = [change.resource.uuid];
+        needsUpdateSelection = true;
 
         var resource = change.resource;
         if (resource.isTopLevel) {
           _files.remove(change.originalResource);
           _files.add(resource);
-          _sortTopLevel();
+          needsSortTopLevel = true;
         }
         // Remove old resources from map.
         change.resourceUuidsMapping.forEach((String oldUuid, String newUuid) {
@@ -700,13 +734,24 @@ class FilesController implements TreeViewDelegate {
         });
         // Add new resources.
         _recursiveAddResource(resource);
-        _reloadDataAndRestoreExpandedState(updatedExpanded);
-        // Save expanded state in prefs.
-        treeViewSaveExpandedState(_treeView);
-        // Update selection.
-        _treeView.selection = [resource.uuid];
       }
     });
+
+    if (needsSortTopLevel) {
+      _sortTopLevel();
+      needsReloadData = true;
+    }
+    if (needsUpdateExpandedState) {
+      _reloadDataAndRestoreExpandedState(updatedExpanded);
+        // Save expanded state in prefs.
+      treeViewSaveExpandedState(_treeView);
+    }
+    else if (needsReloadData) {
+      _reloadData();
+    }
+    if (needsUpdateSelection) {
+      _treeView.selection = updatedSelection;
+    }
   }
 
   /**
@@ -901,6 +946,8 @@ class FilesController implements TreeViewDelegate {
     _filterAddResult(result, roots, childrenCache, res.parent);
   }
 
+  html.Element get _fnfPlaceholder => html.querySelector('#fileNotFoundPlaceholder');
+
   void performFilter(String filterString) {
     if (filterString != null && filterString.isEmpty) {
       filterString = null;
@@ -909,13 +956,14 @@ class FilesController implements TreeViewDelegate {
     if (_filterString == null) {
       _filteredFiles = null;
       _filteredChildrenCache = null;
+      _fnfPlaceholder.classes.add('hidden');
       _reloadDataAndRestoreExpandedState(_currentExpandedState);
     } else {
       Set<String> filtered = new Set();
       _filteredFiles = [];
       _filteredChildrenCache = {};
       _filesMap.forEach((String key, Resource res) {
-        if (res.name.contains(_filterString)) {
+        if (res.name.contains(_filterString) && !res.isDerived()) {
           _filterAddResult(filtered, _filteredFiles, _filteredChildrenCache, res);
         }
       });
@@ -927,6 +975,7 @@ class FilesController implements TreeViewDelegate {
         });
       });
 
+      _fnfPlaceholder.classes.toggle('hidden', _filteredFiles.isNotEmpty);
       _reloadDataAndRestoreExpandedState(filtered.toList());
     }
   }

@@ -20,11 +20,12 @@
 }
 
 #splitView {
-  position: absolute;
+  border-top: 1px solid #ddd;
   bottom: 0;
   left: 0;
+  position: absolute;
   right: 0;
-  top: 40px;
+  top: 0;
 }
 
 #leftNav, #rightNav {
@@ -48,14 +49,28 @@ spark-dialog input:invalid {
   color: red;
 }
 
+spark-dialog {
+  box-sizing: border-box;
+  -moz-box-sizing: border-box;
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  overflow: hidden;
+  background: white;
+  outline: 1px solid rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+spark-dialog a.close {
+  width: 21px;
+  height: 21px;
+  text-align: center;
+}
+
 #toolbar {
   position: absolute;
   left: 0;
-  right: 0;
-}
-
-#toolbarRight {
-  position: absolute;
   right: 0;
 }
 
@@ -84,7 +99,7 @@ spark-dialog input:invalid {
   color: #fff;
   display: inline;
   overflow: hidden;
-  padding: 3px 8px;
+  padding: 5px 8px;
   margin-right: 6px;
 }
 
@@ -142,6 +157,12 @@ spark-dialog input:invalid {
   display: none;
 }
 
+/* Deploy to mobile dialog */
+#pushUrl {
+  margin-left: 17px;
+  width: 20em;
+}
+
 .input-label {
   display: flex;
   margin: 10px 0;
@@ -156,6 +177,10 @@ spark-dialog input:invalid {
 
 .input-label input {
   flex: 1 1 auto;
+}
+
+#webStorePublishDialog label {
+  margin-left: 5px;
 }
 
 [selectableTxt] {

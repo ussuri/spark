@@ -20,6 +20,7 @@ import 'lib/app.dart';
 import 'lib/event_bus.dart';
 import 'lib/jobs.dart';
 import 'lib/platform_info.dart';
+import 'lib/ui/utils/html_utils.dart';
 
 class _TimeLogger {
   final _stepStopwatch = new Stopwatch()..start();
@@ -105,6 +106,10 @@ class SparkPolymerDialog implements Dialog {
 
 class SparkPolymer extends Spark {
   SparkPolymerUI _ui;
+  bool _filterFieldFocused = false;
+  Element _mainMenuButton = querySelector('#mainMenu');
+  Element _runButton = querySelector('#runButton');
+  InputElement _filterField = querySelector('#search');
 
   Future openFolder() {
     return _beforeSystemModal()
@@ -174,9 +179,10 @@ class SparkPolymer extends Spark {
   void initSplitView() {
     syncPrefs.getValue('splitViewPosition').then((String position) {
       if (position != null) {
-        int value = int.parse(position, onError: (_) => 0);
-        if (value != 0) {
-          (getUIElement('#splitView') as dynamic).targetSize = value;
+        int value = int.parse(position, onError: (_) => null);
+        if (value != null) {
+          _ui.splitViewPosition = value;
+          _ui.deliverChanges();
         }
       }
     });
@@ -186,7 +192,7 @@ class SparkPolymer extends Spark {
   void initSaveStatusListener() {
     super.initSaveStatusListener();
 
-    statusComponent = getUIElement('#sparkStatus');
+    statusComponent = querySelector('#sparkStatus');
 
     // Listen for save events.
     eventBus.onEvent(BusEventType.EDITOR_MANAGER__FILES_SAVED).listen((_) {
@@ -220,15 +226,35 @@ class SparkPolymer extends Spark {
   void initToolbar() {
     super.initToolbar();
 
-    _bindButtonToAction('gitClone', 'git-clone');
-    _bindButtonToAction('newProject', 'project-new');
     _bindButtonToAction('runButton', 'application-run');
-    _bindButtonToAction('pushButton', 'application-push');
-    _bindButtonToAction('leftNav', 'navigate-back');
-    _bindButtonToAction('rightNav', 'navigate-forward');
+  }
 
-    InputElement input = getUIElement('#search');
-    input.onInput.listen((e) => filterFilesList(input.value));
+  @override
+  void initFilter() {
+    _filterField.onFocus.listen((e) => _updateFilterFieldState(true));
+    _filterField.onBlur.listen((e) => _updateFilterFieldState(false));
+    _filterField.onInput.listen((e) {
+      _updateFilterFieldState();
+      filterFilesList(_filterField.value);
+    });
+    _filterField.onKeyDown.listen((e) {
+      // When ESC key is pressed.
+      if (e.keyCode == KeyCode.ESC) {
+        _filterField.value = '';
+        _updateFilterFieldState();
+        filterFilesList(null);
+        cancelEvent(e);
+      }
+    });
+  }
+
+  void _updateFilterFieldState([bool focused]) {
+    if (focused != null) {
+      _filterFieldFocused = focused;
+    }
+    bool value = _filterFieldFocused && _filterField.value.isNotEmpty;
+    _mainMenuButton.hidden = value;
+    _runButton.hidden = value;
   }
 
   @override
@@ -240,6 +266,11 @@ class SparkPolymer extends Spark {
   @override
   Future restoreLocationManager() => super.restoreLocationManager();
 
+  @override
+  void menuActivateEventHandler(CustomEvent event) {
+    _ui.onMenuSelected(event, event.detail);
+  }
+
   //
   // - End parts of the parent's init().
   //
@@ -250,10 +281,11 @@ class SparkPolymer extends Spark {
   }
 
   void _bindButtonToAction(String buttonId, String actionId) {
-    SparkButton button = getUIElement('#${buttonId}');
+    SparkButton button = querySelector('#${buttonId}');
     Action action = actionManager.getAction(actionId);
     action.onChange.listen((_) {
       button.enabled = action.enabled;
+      button.deliverChanges();
     });
     button.onClick.listen((_) {
       if (action.enabled) action.invoke();

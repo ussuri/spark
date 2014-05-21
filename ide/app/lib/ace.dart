@@ -22,7 +22,7 @@ import 'css/cssbeautify.dart';
 import 'editors.dart';
 import 'navigation.dart';
 import 'package_mgmt/bower_properties.dart';
-import 'package_mgmt/pub.dart';
+import 'package_mgmt/pub_properties.dart';
 import 'platform_info.dart';
 import 'preferences.dart';
 import 'utils.dart' as utils;
@@ -30,6 +30,7 @@ import 'workspace.dart' as workspace;
 import 'services.dart' as svc;
 import 'outline.dart';
 import 'ui/polymer/goto_line_view/goto_line_view.dart';
+import 'utils.dart';
 
 export 'package:ace/ace.dart' show EditSession;
 
@@ -42,28 +43,35 @@ class TextEditor extends Editor {
   StreamSubscription _aceSubscription;
   StreamController _dirtyController = new StreamController.broadcast();
   StreamController _modificationController = new StreamController.broadcast();
+  Completer<Editor> _whenReadyCompleter = new Completer();
 
+  final SparkPreferences _prefs;
   ace.EditSession _session;
 
   String _lastSavedHash;
 
   bool _dirty = false;
 
-  factory TextEditor(AceManager aceManager, workspace.File file) {
+  factory TextEditor(AceManager aceManager, workspace.File file,
+      SparkPreferences prefs) {
     if (DartEditor.isDartFile(file)) {
-      return new DartEditor._create(aceManager, file);
+      return new DartEditor._create(aceManager, file, prefs);
     }
     if (CssEditor.isCssFile(file)) {
-      return new CssEditor._create(aceManager, file);
+      return new CssEditor._create(aceManager, file, prefs);
     }
-    return new TextEditor._create(aceManager, file);
+    return new TextEditor._create(aceManager, file, prefs);
   }
 
-  TextEditor._create(this.aceManager, this.file);
+  TextEditor._create(this.aceManager, this.file, this._prefs);
+
+  Future<Editor> get whenReady => _whenReadyCompleter.future;
 
   void setSession(ace.EditSession value) {
     _session = value;
+    if (_aceSubscription != null) _aceSubscription.cancel();
     _aceSubscription = _session.onChange.listen((_) => dirty = true);
+    if (!_whenReadyCompleter.isCompleted) _whenReadyCompleter.complete(this);
   }
 
   bool get dirty => _dirty;
@@ -133,7 +141,7 @@ class TextEditor extends Editor {
     }
   }
 
-  Future save([bool stripWhitespace = false]) {
+  Future save() {
     // We store a hash of the contents when saving. When we get a change
     // notification (in fileContentsChanged()), we compare the last write to the
     // contents on disk.
@@ -143,7 +151,9 @@ class TextEditor extends Editor {
       //           but it might be a good idea to do so rather than passing it.
 
       String text = _session.value;
-      if (stripWhitespace) text = text.replaceAll(whitespaceRegEx, '');
+
+      if (_prefs.stripWhitespaceOnSave) text =
+          text.replaceAll(whitespaceRegEx, '');
       _lastSavedHash = _calcMD5(text);
 
       // TODO(ericarnold): Need to cache or re-analyze on file switch.
@@ -182,12 +192,26 @@ class TextEditor extends Editor {
 }
 
 class DartEditor extends TextEditor {
+  int outlineScrollPosition = 0;
+
   static bool isDartFile(workspace.File file) => file.name.endsWith('.dart');
 
-  DartEditor._create(AceManager aceManager, workspace.File file) :
-      super._create(aceManager, file);
+  DartEditor._create(AceManager aceManager, workspace.File file,
+      SparkPreferences prefs) : super._create(aceManager, file, prefs);
 
   bool get supportsOutline => true;
+
+  @override
+  void activate() {
+    super.activate();
+    aceManager.outline.scrollPosition = outlineScrollPosition;
+  }
+
+  @override
+  void deactivate() {
+    super.deactivate();
+    outlineScrollPosition = aceManager.outline.scrollPosition;
+  }
 
   void navigateToDeclaration() {
     int offset = _session.document.positionToIndex(
@@ -196,12 +220,16 @@ class DartEditor extends TextEditor {
     aceManager._analysisService.getDeclarationFor(file, offset).then(
         (svc.Declaration declaration) {
       if (declaration != null) {
-        workspace.File targetFile = declaration.getFile(file.project);
+        if (declaration is svc.SourceDeclaration) {
+          workspace.File targetFile = declaration.getFile(file.project);
 
-        // Open targetFile and select the range of text.
-        if (targetFile != null) {
-          Span selection = new Span(declaration.offset, declaration.length);
-          aceManager.delegate.openEditor(targetFile, selection: selection);
+          // Open targetFile and select the range of text.
+          if (targetFile != null) {
+            Span selection = new Span(declaration.offset, declaration.length);
+            aceManager.delegate.openEditor(targetFile, selection: selection);
+          }
+        } else if (declaration is svc.DocDeclaration) {
+          html.window.open(declaration.url, "spark_doc");
         }
       }
     });
@@ -211,8 +239,8 @@ class DartEditor extends TextEditor {
 class CssEditor extends TextEditor {
   static bool isCssFile(workspace.File file) => file.name.endsWith('.css');
 
-  CssEditor._create(AceManager aceManager, workspace.File file) :
-      super._create(aceManager, file);
+  CssEditor._create(AceManager aceManager, workspace.File file,
+    SparkPreferences prefs) : super._create(aceManager, file, prefs);
 
   bool get supportsFormat => true;
 
@@ -281,6 +309,19 @@ class AceManager {
         const ace.BindKey(mac: 'Command-L', win: 'Ctrl-L'),
         _showGotoLineView);
     _aceEditor.commands.addCommand(command);
+    if (PlatformInfo.isMac) {
+      command = new ace.Command(
+          'scrolltobeginningofdocument',
+          const ace.BindKey(mac: 'Home'),
+          _scrollToBeginningOfDocument);
+      _aceEditor.commands.addCommand(command);
+
+      command = new ace.Command(
+          'scrolltoendofdocument',
+          const ace.BindKey(mac: 'End'),
+          _scrollToEndOfDocument);
+      _aceEditor.commands.addCommand(command);
+    }
 
     // Add some additional file extension editors.
     ace.Mode.extensionMap['classpath'] = ace.Mode.XML;
@@ -299,6 +340,7 @@ class AceManager {
 
   void _setupOutline(PreferenceStore prefs) {
     outline = new Outline(_analysisService, parentElement, prefs);
+
     outline.onChildSelected.listen((OutlineItem item) {
       ace.Point startPoint =
           currentSession.document.indexToPosition(item.nameStartOffset);
@@ -326,6 +368,9 @@ class AceManager {
 
     // Set up the goto line dialog.
     gotoLineView = new GotoLineView();
+    if (gotoLineView is! GotoLineView) {
+      html.querySelector('#splashScreen').style.backgroundColor = 'red';
+    }
     gotoLineView.style.zIndex = '101';
     parentElement.children.add(gotoLineView);
     gotoLineView.onTriggered.listen(_handleGotoLineViewEvent);
@@ -350,12 +395,9 @@ class AceManager {
   }
 
   String _formatAnnotationItemText(String text, [String type]) {
-    String labelHtml = "";
-    if (type != null) {
-      String typeText = type.substring(0, 1).toUpperCase() + type.substring(1);
-      labelHtml = "<span class=ace_gutter-tooltip-label-$type>$typeText: </span>";
-    }
-    return "$labelHtml$text";
+    if (type == null) return text;
+
+    return "<img class='ace-tooltip' src='images/${type}_icon.png'> ${text}";
   }
 
   void setMarkers(List<workspace.Marker> markers) {
@@ -388,17 +430,17 @@ class AceManager {
       String markerHtml = _formatAnnotationItemText(marker.message,
           annotationType);
 
-      // Ace uses 0-based lines.
       ace.Point charPoint = currentSession.document.indexToPosition(
           marker.charStart);
-      int aceRow = charPoint.row;
+      // Ace uses 0-based lines.
+      int aceRow = marker.lineNum - 1;
       int aceColumn = charPoint.column;
 
       // If there is an existing annotation, delete it and combine into one.
       var existingAnnotation = annotationByRow[aceRow];
       if (existingAnnotation != null) {
-        markerHtml = existingAnnotation.html
-            + "<div class=\"ace_gutter-tooltip-divider\"></div>$markerHtml";
+        markerHtml = '${existingAnnotation.html}'
+            '<div class="ace-tooltip-divider"></div>${markerHtml}';
         annotations.remove(existingAnnotation);
       }
 
@@ -409,15 +451,15 @@ class AceManager {
       annotations.add(annotation);
       annotationByRow[aceRow] = annotation;
 
-      double markerHorizontalPercentage = currentSession.documentToScreenRow(
+      double verticalPercentage = currentSession.documentToScreenRow(
           marker.lineNum, aceColumn) / numberLines;
 
       String markerPos;
+
       if (!isScrolling) {
-        markerPos = (markerHorizontalPercentage * documentHeight).toString() + "px";
+        markerPos = '${verticalPercentage * documentHeight}px';
       } else {
-        markerPos = (markerHorizontalPercentage * 100.0)
-            .toStringAsFixed(2) + "%";
+        markerPos = (verticalPercentage * 100.0).toStringAsFixed(2) + "%";
       }
 
       // TODO(ericarnold): This should also be based upon annotations so ace's
@@ -557,6 +599,12 @@ class AceManager {
     handler.onLoad.then((_) => _aceEditor.keyBinding.keyboardHandler = handler);
   }
 
+  num getFontSize() => _aceEditor.fontSize;
+
+  void setFontSize(num size) {
+    _aceEditor.fontSize = size;
+  }
+
   void focus() => _aceEditor.focus();
 
   void resize() => _aceEditor.resize(false);
@@ -660,7 +708,11 @@ class AceManager {
     }
   }
 
-  void _showGotoLineView(_) => gotoLineView.show();
+  void _showGotoLineView(_) {
+    html.Element searchElement = parentElement.querySelector('.ace_search');
+    if (searchElement != null) searchElement.style.display = 'none';
+    gotoLineView.show();
+  }
 
   void _handleGotoLineViewEvent(int line) {
     _aceEditor.gotoLine(line);
@@ -668,6 +720,15 @@ class AceManager {
   }
 
   void _handleGotoLineViewClosed(_) => focus();
+
+  void _scrollToBeginningOfDocument(_) {
+    _aceEditor.session.scrollTop = 0;
+  }
+
+  void _scrollToEndOfDocument(_) {
+    int lineHeight = html.querySelector('.ace_gutter-cell').clientHeight;
+    _aceEditor.session.scrollTop = _aceEditor.session.document.length * lineHeight;
+  }
 }
 
 class ThemeManager {
@@ -766,6 +827,44 @@ class KeyBindingManager {
 
   void _updateName(String name) {
     _label.text = (name == null ? 'Default' : utils.capitalize(name));
+  }
+}
+
+class AceFontManager {
+  AceManager aceManager;
+  PreferenceStore prefs;
+  html.Element _label;
+  num _value;
+
+  AceFontManager(this.aceManager, this.prefs, this._label) {
+    _value = aceManager.getFontSize();
+    _updateLabel(_value);
+
+    prefs.getValue('fontSize').then((String pref) {
+      try {
+        _value = num.parse(pref);
+        aceManager.setFontSize(_value);
+        _updateLabel(_value);
+      } catch (e) {
+
+      }
+    });
+  }
+
+  void dec() => _adjustSize(_value - 2);
+
+  void inc() => _adjustSize(_value + 2);
+
+  void _adjustSize(num newValue) {
+    // Clamp to between 6pt and 36pt.
+    _value = newValue.clamp(6, 36);
+    aceManager.setFontSize(_value);
+    _updateLabel(_value);
+    prefs.setValue('fontSize', _value.toString());
+  }
+
+  void _updateLabel(num size) {
+    _label.text = '${size}pt';
   }
 }
 

@@ -6,24 +6,44 @@
 @import url("../../../packages/bootjack/css/bootstrap.min.css");
 
 :host {
+  background-color: #dadada;
   display: block;
+  position: relative;
+  /* Set a identity transform to make <spark-splitter> to be a stacking context.
+     Then, z-index in #draggable becomes relative to :host.
+     Read more about stacking context here:
+     https://developer.mozilla.org/en-US/docs/Web/Guide/CSS/Understanding_z_index/The_stacking_context*/
+  transform: scaleZ(1);
+}
+
+:host([handle]:host) {
   border-left: 1px solid #DDD;
   border-right: 1px solid #DDD;
-  cursor: col-resize;
   background-color: #F7F7F7;
 }
 
-:host(.horizontal) {
-  cursor: row-resize;
-}
-
-:host(.vertical-handle) {
+:host([handle].vertical:host) {
   background: url('handle_vert.png') no-repeat center;
 }
 
-:host(.horizontal-handle) {
+:host([handle].horizontal:host) {
   background: url('handle_horiz.png') no-repeat center;
 }
 
-:host:hover, :host(.active) {
+#draggable {
+  position: absolute;
+  z-index: 1;
+  /* With fully transparent #draggable, the mouse sometimes didn't react
+     to hovering over it, depending on the surrounding elements. A CSS bug?
+  */
+  background-color: white;
+  opacity: 0.001;
+}
+
+:host(.vertical:host) #draggable {
+  cursor: col-resize;
+}
+
+:host(.horizontal:host) #draggable {
+  cursor: row-resize;
 }
