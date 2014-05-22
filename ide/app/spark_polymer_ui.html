@@ -12,6 +12,7 @@
 <link rel="import" href="packages/spark_widgets/spark_menu_item/spark_menu_item.html">
 <link rel="import" href="packages/spark_widgets/spark_menu_separator/spark_menu_separator.html">
 <link rel="import" href="packages/spark_widgets/spark_modal/spark_modal.html">
+<link rel="import" href="packages/spark_widgets/spark_progress/spark_progress.html">
 <link rel="import" href="packages/spark_widgets/spark_split_view/spark_split_view.html">
 <link rel="import" href="packages/spark_widgets/spark_status/spark_status.html">
 <link rel="import" href="packages/spark_widgets/spark_toolbar/spark_toolbar.html">
@@ -30,7 +31,87 @@
         targetSize="{{splitViewPosition}}"
         minTargetSize="200"
         on-update="{{onSplitterUpdate}}">
-      <content></content>
+      <div beforeSplit>
+        <spark-toolbar id="toolbar">
+          <input type="fileFilter"
+              id="fileFilter"
+              placeholder="Filter"
+              on-keydown="{{fileFilterKeydownHandler}}"
+              on-input="{{fileFilterInputHandler}}"/>
+
+          <spark-button id="runButton" noBorder>
+            <span class="glyphicon glyphicon-play"></span>
+          </spark-button>
+
+          <spark-menu-button
+              id="mainMenu"
+              icon="images/overflow.png"
+              valueAttr="action-id"
+              valign="left"
+              on-activate="{{onMenuSelected}}">
+            <spark-menu-item action-id="project-new" label="New Project...">
+            </spark-menu-item>
+
+            <spark-menu-separator></spark-menu-separator>
+
+            <spark-menu-item action-id="file-open" label="Open File...">
+            </spark-menu-item>
+            <spark-menu-item action-id="folder-open" label="Open Folder...">
+            </spark-menu-item>
+            <spark-menu-item action-id="git-clone" label="Git Clone...">
+            </spark-menu-item>
+
+            <spark-menu-separator></spark-menu-separator>
+
+            <spark-menu-item action-id="application-run" label="Run Application">
+            </spark-menu-item>
+            <spark-menu-item action-id="application-push" label="Deploy to Mobile...">
+            </spark-menu-item>
+            <spark-menu-item action-id="webstore-publish" label="Publish to Chrome Web Store...">
+            </spark-menu-item>
+
+            <template if="{{developerMode}}">
+              <spark-menu-separator></spark-menu-separator>
+              <spark-menu-item action-id="run-tests" label="Run Tests">
+              </spark-menu-item>
+            </template>
+
+            <spark-menu-separator></spark-menu-separator>
+
+            <spark-menu-item action-id="settings" label="Settings...">
+            </spark-menu-item>
+            <spark-menu-item action-id="send-feedback" label="Send Feedback...">
+            </spark-menu-item>
+            <spark-menu-item action-id="help-about" label="About Spark">
+            </spark-menu-item>
+          </spark-menu-button>
+        </spark-toolbar>
+
+        <content select="#fileViewArea"></content>
+
+        <template if="{{showNoFileFilterMatches}}">
+          <div id="fileNotFoundPlaceholder">
+            No matching files
+          </div>
+        </template>
+      </div>
+
+      <div afterSplit>
+        <content select="#editorArea"></content>
+
+        <spark-toolbar id="navigationButtons">
+          <spark-button id="leftNav" noBorder>
+            <i class="fa fa-arrow-left"></i>
+          </spark-button>
+          <spark-button id="rightNav" noBorder>
+            <i class="fa fa-arrow-right"></i>
+          </spark-button>
+        </spark-toolbar>
+
+        <div id="sparkStatusContainer">
+         <spark-status id="sparkStatus"></spark-status>
+        </div>
+      </div>
     </spark-split-view>
 
     <!-- Error dialog -->
@@ -171,17 +252,15 @@
     </spark-dialog>
 
     <!-- Harness Push dialog -->
-    <spark-dialog id="pushDialog"
+    <spark-dialog id="mobileDeployDialog"
         title="Deploy to Mobile"
         buttons="cancel;ok:Deploy">
       <h4>Deploy a Chrome App to an Android Device</h4>
       <p>
-        Please make sure you have
+        Please start the
         <a href="https://github.com/MobileChromeApps/harness/releases/"
-            on-click="{{handleAnchorClick}}">
-          Chrome ADT
-        </a>
-        installed and running on your Android device.
+            on-click="{{handleAnchorClick}}"></a>
+        application on your Android device.
       </p>
       <div class="form-group">
         <form>
@@ -197,6 +276,12 @@
                 pattern="(\d{1,3}\.){3}\d{1,3}" spellcheck="false" autosave/>
           </div>
         </form>
+      </div>
+      <spark-progress id="deployProgress"
+          indeterminate showProgressMessage showCancel visible="false">
+      </spark-progress>
+      <div id='deployCheckDeviceMessage'>
+        Please check for a connection authorization dialog on your device.
       </div>
       <!--div class="modal-footer">
         <spark-button overlay-toggle data-dismiss="modal">
@@ -560,22 +645,13 @@
       </div-->
     </spark-dialog>
 
-    <!-- Dialog shown while pushing an application to ADB. -->
-    <spark-dialog id="pushADBProgressDialog">
-      <label>Push to the mobile device in progress</label>
-      <div class="help-block">
-        Please unlock the phone and check whether it's asking for a
-        connection authorization.
-      </div>
-    </spark-modal>
-
     <!-- Project remove dialog -->
     <spark-dialog id="projectRemoveDialog"
         title="Remove Project"
         buttons="cancel;delete:Delete[closeDialog];remove:Remove Reference[closeDialog primary focused]">
       <div class="help-block">
         Choose "Delete" if you want to remove
-        &quot;<span id="name"></span>&quot; permanently from
+        &quot;<span id="projectRemoveProjectName"></span>&quot; permanently from
         disk or choose "Remove Reference" if you'd like to remove it from
         the list of projects in Spark but keep your files on disk.
       </div>
