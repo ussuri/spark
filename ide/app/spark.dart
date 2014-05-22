@@ -421,7 +421,7 @@ abstract class Spark
     actionManager.registerAction(new BowerGetAction(this));
     actionManager.registerAction(new BowerUpgradeAction(this));
     actionManager.registerAction(new ApplicationRunAction(this));
-    actionManager.registerAction(new ApplicationPushAction(this, getDialogElement('#mobileDeployDialog')));
+    actionManager.registerAction(new DeployToMobileAction(this, getDialogElement('#mobileDeployDialog')));
     actionManager.registerAction(new CompileDartAction(this));
     actionManager.registerAction(new GitCloneAction(this, getDialogElement("#gitCloneDialog")));
     if (SparkFlags.showGitPull) {
@@ -462,6 +462,8 @@ abstract class Spark
     actionManager.registerAction(new GotoDeclarationAction(this));
     actionManager.registerAction(new HistoryAction.back(this));
     actionManager.registerAction(new HistoryAction.forward(this));
+    actionManager.registerAction(new ToggleOutlineVisibilityAction(this));
+    actionManager.registerAction(new SendFeedbackAction(this));
 
     actionManager.registerKeyListener();
   }
@@ -653,11 +655,11 @@ abstract class Spark
     }
 
     if (title == null) {
-      _okCancelDialog.getElement('.modal-header').style.display = 'none';
-      _okCancelDialog.getElement('.modal-header .modal-title').text = '';
+      _okCancelDialog.getShadowDomElement('.modal-header').style.display = 'none';
+      _okCancelDialog.getShadowDomElement('.modal-header .modal-title').text = '';
     } else {
-      _okCancelDialog.getElement('.modal-header').style.display = 'block';
-      _okCancelDialog.getElement('.modal-header .modal-title').text = title;
+      _okCancelDialog.getShadowDomElement('.modal-header').style.display = 'block';
+      _okCancelDialog.getShadowDomElement('.modal-header .modal-title').text = title;
     }
     Element container = _okCancelDialog.getElement('#okCancelMessage');
 
@@ -1955,11 +1957,11 @@ class FolderOpenAction extends SparkAction {
   }
 }
 
-class ApplicationPushAction extends SparkActionWithDialog implements ContextAction {
+class DeployToMobileAction extends SparkActionWithDialog implements ContextAction {
   InputElement _pushUrlElement;
   ws.Container deployContainer;
 
-  ApplicationPushAction(Spark spark, Element dialog)
+  DeployToMobileAction(Spark spark, Element dialog)
       : super(spark, "application-push", "Deploy to Mobile", dialog) {
     _pushUrlElement = _triggerOnReturn("#pushUrl");
     enabled = false;
