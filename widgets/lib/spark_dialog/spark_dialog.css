@@ -14,9 +14,9 @@
   left: calc(50% - 256px);
   box-sizing: border-box;
   background: white;
-  outline: 1px solid rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(0, 0, 0, 0.2);
   border-radius: 5px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 
 .modal-header {
