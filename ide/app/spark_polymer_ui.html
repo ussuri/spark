@@ -403,17 +403,23 @@
         <div class="form-group" id="changeTheme">
           <label class="control-label">Editor theme</label>
           <div>
-            <span class="settings-label"></span>
-            <span class="plus-minus-container">
-              <a href="#" id="themeMinus" class="plus-minus-button"
-                  on-click="{{onThemeMinus}}">
-                <span class="glyphicon glyphicon-chevron-left"></span>
-              </a>
-              <a href="#" id="themePlus" class="plus-minus-button"
-                  on-click="{{onThemePlus}}">
-                <span class="glyphicon glyphicon-chevron-right"></span>
-              </a>
-            </span>
+            <spark-toolbar class="plus-minus-container"
+                horizontal justify="spaced">
+              <span class="settings-label"></span>
+              <spark-button id="themeMinus" class="plus-minus-button"
+                  flat round noPadding on-click="{{onThemeMinus}}">
+                <!--TODO(ussuri): Use SVG <use> directives instead here and below.-->
+                <svg viewBox="0 0 24 24">
+                  <polygon points="15.4,7.4 14,6 8,12 14,18 15.4,16.6 10.8,12 "></polygon>
+                </svg>  
+              </spark-button>
+              <spark-button id="themePlus" class="plus-minus-button"
+                  flat round noPadding on-click="{{onThemePlus}}">
+                <svg viewBox="0 0 24 24">
+                  <polygon points="10,6 8.6,7.4 13.2,12 8.6,16.6 10,18 16,12 "></polygon>
+                </svg>  
+              </spark-button>
+            </spark-toolbar>
           </div>
         </div>
       </template>
@@ -421,43 +427,53 @@
       <div class="form-group" id="changeFont">
         <label class="control-label">Editor font</label>
         <div>
-          <span class="settings-label"></span>
-          <span class="plus-minus-container">
-            <a href="#" id="fontMinus" class="plus-minus-button"
-                on-click="{{onFontSmaller}}">
-              <span class="glyphicon glyphicon-minus"></span>
-            </a>
-            <a href="#" id="fontPlus" class="plus-minus-button"
-                on-click="{{onFontLarger}}">
-              <span class="glyphicon glyphicon-plus"></span>
-            </a>
-          </span>
+          <spark-toolbar class="plus-minus-container"
+              horizontal justify="spaced">
+            <span class="settings-label"></span>
+            <spark-button id="fontMinus" class="plus-minus-button"
+                flat round noPadding on-click="{{onFontSmaller}}">
+              <svg viewBox="0 0 24 24">
+                <path d="M19,13H5v-2h14V13z"></path>
+              </svg>
+            </spark-button>
+            <spark-button id="fontPlus" class="plus-minus-button"
+                flat round noPadding on-click="{{onFontLarger}}">
+              <svg viewBox="0 0 24 24">
+                <path d="M19,13h-6v6h-2v-6H5v-2h6V5h2v6h6V13z"></path>
+              </svg>
+            </spark-button>
+          </spark-toolbar>
         </div>
       </div>
 
       <div class="form-group" id="changeKeys">
         <label class="control-label">Key bindings</label>
         <div>
-          <span class="settings-label"></span>
-          <span class="plus-minus-container">
-            <a href="#" id="keysMinus" class="plus-minus-button"
-                on-click="{{onKeysMinus}}">
-              <span class="glyphicon glyphicon-chevron-left"></span>
-            </a>
-            <a href="#" id="keysPlus" class="plus-minus-button"
-                on-click="{{onKeysPlus}}">
-              <span class="glyphicon glyphicon-chevron-right"></span>
-            </a>
-          </span>
+          <spark-toolbar class="plus-minus-container"
+              horizontal justify="spaced">
+            <span class="settings-label"></span>
+            <spark-button id="keysMinus" class="plus-minus-button"
+                flat round noPadding on-click="{{onKeysMinus}}">
+              <svg viewBox="0 0 24 24">
+                <polygon points="15.4,7.4 14,6 8,12 14,18 15.4,16.6 10.8,12 "></polygon>
+              </svg>  
+            </spark-button>
+            <spark-button id="keysPlus" class="plus-minus-button"
+                flat round noPadding on-click="{{onKeysPlus}}">
+              <svg viewBox="0 0 24 24">
+                <polygon points="10,6 8.6,7.4 13.2,12 8.6,16.6 10,18 16,12 "></polygon>
+              </svg>  
+            </spark-button>
+          </spark-toolbar>
         </div>
       </div>
 
       <div class="form-group">
         <label class="control-label">Git</label>
         <div>
-          <spark-dialog-button on-click="{{onResetGit}}">
+          <spark-button flat on-click="{{onResetGit}}">
             Clear Git Credentials
-          </spark-dialog-button>
+          </spark-button>
           <span id="gitResetSettingsDone">Done</span>
         </div>
       </div>
@@ -475,7 +491,7 @@
         <div class="form-group">
           <label class="control-label">Preferences</label>
           <div>
-            <spark-button on-click="{{onResetPreference}}">
+            <spark-button flat on-click="{{onResetPreference}}">
               Reset Preferences
             </spark-button>
             <span id="preferenceResetResult"></span>
@@ -483,7 +499,7 @@
         </div>
       </template>
 
-      <spark-dialog-button submit focused>Close</spark-dialog-button>
+      <spark-dialog-button dismiss focused>Close</spark-dialog-button>
     </spark-dialog>
 
     <!-- Git authentication dialog -->
