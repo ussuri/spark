@@ -16,6 +16,7 @@
 <link rel="import" href="packages/spark_widgets/spark_split_view/spark_split_view.html">
 <link rel="import" href="packages/spark_widgets/spark_status/spark_status.html">
 <link rel="import" href="packages/spark_widgets/spark_toolbar/spark_toolbar.html">
+<link rel="import" href="packages/spark_widgets/spark_toggle_button/spark_toggle_button.html">
 <link rel="import" href="lib/ui/polymer/commit_message_view/commit_message_view.html">
 <link rel="import" href="lib/ui/polymer/goto_line_view/goto_line_view.html">
 
@@ -399,12 +400,12 @@
     <spark-dialog id="settingsDialog" title="Settings">
       <div class="form-group">
         <spark-toolbar class="settings-block" horizontal justify="left">
-          <label class="settings-label">Whitespace:</label>
-          <span class="checkbox">
-            <input id="stripWhitespace" type="checkbox">
-            <label for="stripWhitespace">
-              Strip trailing whitespace on save
-            </label>
+          <label class="settings-label">Trailing whitespace:</label>
+          <span>
+            <spark-toggle-button id="stripWhitespace"
+                onLabel="Strip on save"
+                offLabel="Preserve">
+            </spark-toggle-button>
           </span>
         </spark-toolbar>
       </div>

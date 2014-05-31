@@ -24,6 +24,7 @@ import 'package:spark_widgets/spark_progress/spark_progress.dart';
 import 'package:spark_widgets/spark_splitter/spark_splitter.dart';
 import 'package:spark_widgets/spark_split_view/spark_split_view.dart';
 import 'package:spark_widgets/spark_status/spark_status.dart';
+import 'package:spark_widgets/spark_toggle_button/spark_toggle_button.dart';
 import 'package:spark_widgets/spark_toolbar/spark_toolbar.dart';
 
 import 'lib/utils.dart';
@@ -56,7 +57,9 @@ void main() {
   Polymer.register('spark-splitter', SparkSplitter);
   Polymer.register('spark-split-view', SparkSplitView);
   Polymer.register('spark-status', SparkStatus);
+  Polymer.register('spark-toggle-button', SparkToggleButton);
   Polymer.register('spark-toolbar', SparkToolbar);
+
   Polymer.register('commit-message-view', CommitMessageView);
   Polymer.register('goto-line-view', GotoLineView);
   Polymer.register('spark-polymer-ui', SparkPolymerUI);

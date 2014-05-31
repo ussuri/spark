@@ -18,14 +18,16 @@
 <link rel="import" href="../../../packages/spark_widgets/common/spark_widget.html"/>
 
 <polymer-element name="spark-toggle-button" extends="spark-widget"
-    attributes="value">
+    attributes="onLabel
+                offLabel
+                checked">
   <template>
     <link rel="stylesheet" href="spark_toggle_button.css">
 
     <div id="toggle">
-      <span id="onLabel">ON</span>
+      <span id="onLabel">{{onLabel}}</span>
       <span id="thumb"></span>
-      <span id="offLabel">OFF</span>
+      <span id="offLabel">{{offLabel}}</span>
     </div>
   </template>
 

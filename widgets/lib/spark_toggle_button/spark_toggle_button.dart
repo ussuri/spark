@@ -17,8 +17,10 @@ import '../common/spark_widget.dart';
 //               be needed.
 @CustomTag("spark-toggle-button")
 class SparkToggleButton extends SparkWidget {
+  @published String onLabel = 'ON';
+  @published String offLabel = 'OFF';
   /// Gets or sets the state, true is ON and false is OFF.
-  @observable bool value = false;
+  @published bool checked = false;
 
   int _x;
   int _w;
@@ -33,12 +35,12 @@ class SparkToggleButton extends SparkWidget {
 //    onFlick.listen(flick);
   }
 
-  void valueChanged() {
-    $['toggle'].classes.toggle('on', value);
+  void checkedChanged() {
+    $['toggle'].classes.toggle('on', checked);
   }
 
   void toggle(Event e) {
-    value = !value;
+    checked = !checked;
   }
 
   // TODO(ussuri): Enable when tap events become supported.
@@ -49,18 +51,18 @@ class SparkToggleButton extends SparkWidget {
 //  }
 //
 //  void track(MouseEvent e) {
-//    _x = max(-_w, min(0, value ? e.client.x : e.client.y - _w));
+//    _x = max(-_w, min(0, checked ? e.client.x : e.client.y - _w));
 //    $['toggle'].style.left = '${_x}px';
 //  }
 //
 //  void trackEnd(MouseEvent e) {
 //    $['toggle'].style.left = null;
 //    $['toggle'].classes.remove('dragging');
-//    value = _x.abs() < _w / 2;
+//    checked = _x.abs() < _w / 2;
 //  }
 //
 //  void flick(Event e) {
-//    this.value = e.xVelocity > 0;
+//    this.checked = e.xVelocity > 0;
 //    Platform.flush();
 //  }
 }

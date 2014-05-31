@@ -15,6 +15,7 @@ import 'package:path/path.dart' as path;
 import 'package:spark_widgets/spark_dialog/spark_dialog.dart';
 import 'package:spark_widgets/spark_dialog_button/spark_dialog_button.dart';
 import 'package:spark_widgets/spark_progress/spark_progress.dart';
+import 'package:spark_widgets/spark_toggle_button/spark_toggle_button.dart';
 import 'package:spark_widgets/spark_status/spark_status.dart';
 
 import 'lib/ace.dart';
@@ -3120,6 +3121,7 @@ class AboutSparkAction extends SparkActionWithDialog {
 class SettingsAction extends SparkActionWithDialog {
   // TODO(ussuri): This is essentially unused. Remove.
   bool _initialized = false;
+  SparkToggleButton _whitespaceCheckbox;
 
   SettingsAction(Spark spark, Element dialog)
       : super(spark, "settings", "Settings", dialog);
@@ -3131,13 +3133,13 @@ class SettingsAction extends SparkActionWithDialog {
 
     spark.setGitSettingsResetDoneVisible(false);
 
-    var whitespaceCheckbox = getElement('#stripWhitespace');
+    _whitespaceCheckbox = getElement('#stripWhitespace');
 
     // Wait for each of the following to (simultaneously) complete before
     // showing the dialog:
     Future.wait([
       spark.prefs.onPreferencesReady.then((_) {
-        whitespaceCheckbox.checked = spark.prefs.stripWhitespaceOnSave;
+        _whitespaceCheckbox.checked = spark.prefs.stripWhitespaceOnSave;
       }), new Future.value().then((_) {
         // For now, don't show the location field on Chrome OS; we always use syncFS.
         if (PlatformInfo.isCros) {
@@ -3148,13 +3150,13 @@ class SettingsAction extends SparkActionWithDialog {
       })
     ]).then((_) {
       _show();
-      whitespaceCheckbox.onChange.listen((e) {
-        spark.prefs.stripWhitespaceOnSave = whitespaceCheckbox.checked;
-      });
     });
   }
 
-  void _commit() => _hide();
+  void _commit() {
+    _hide();
+    spark.prefs.stripWhitespaceOnSave = _whitespaceCheckbox.checked;
+  }
 
   Future _showRootDirectory() {
     return spark.localPrefs.getValue('projectFolder').then((folderToken) {
