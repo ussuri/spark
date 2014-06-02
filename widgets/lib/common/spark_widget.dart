@@ -4,6 +4,7 @@
 
 library spark_widgets;
 
+import 'dart:async';
 import 'dart:html';
 
 import 'package:polymer/polymer.dart';
@@ -116,6 +117,10 @@ class SparkWidget extends PolymerElement {
     } else {
       unveil();
     }
+  }
+
+  void eventForwarder(CustomEvent e) {
+    asyncFire(e.type, detail: e.detail);
   }
 
   /**
