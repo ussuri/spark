@@ -11,24 +11,17 @@ import 'package:polymer/polymer.dart';
 
 import '../common/spark_widget.dart';
 import '../spark_button/spark_button.dart';
-import '../spark_menu/spark_menu.dart';
-// TODO(ussuri): Temporary. See the comment below.
-import '../spark_overlay/spark_overlay.dart';
+import '../spark_menu_box/spark_menu_box.dart';
 
 @CustomTag("spark-menu-button")
 class SparkMenuButton extends SparkWidget {
   @published dynamic selected;
   @published String valueAttr = '';
   @published bool opened = false;
-  @published bool responsive = false;
   @published String arrow = 'none';
-  static final List<String> _SUPPORTED_ARROWS = [
-    'none', 'top-center', 'top-left', 'top-right'
-  ];
-  
+
   SparkButton _button;
-  SparkOverlay _overlay;
-  SparkMenu _menu;
+  SparkMenuBox _menu;
 
   final List<bool> _toggleQueue = [];
   Timer _toggleTimer;
@@ -39,9 +32,6 @@ class SparkMenuButton extends SparkWidget {
   void enteredView() {
     super.enteredView();
 
-    assert(_SUPPORTED_ARROWS.contains(arrow));
-
-    _overlay = $['overlay'];
     _menu = $['menu'];
 
     final ContentElement buttonCont = $['button'];
@@ -73,16 +63,16 @@ class SparkMenuButton extends SparkWidget {
    * Complete the toggling process, see [_toggle].
    */
   void _completeToggle() {
-    // Most likely, all aggregated events for a single gesture will have the 
+    // Most likely, all aggregated events for a single gesture will have the
     // same value (either 'close' or 'open'), but we don't count on that and
     // formally && all the values just in case.
     final bool newOpened = _toggleQueue.reduce((a, b) => a && b);
     if (newOpened != opened) {
       opened = newOpened;
-      // TODO(ussuri): A temporary plug to make #overlay and #button see
+      // TODO(ussuri): A temporary plug to make #menu and #button see
       // changes in 'opened'. Data binding via {{opened}} in the HTML isn't
       // detected. deliverChanges() fixes #overlay, but not #button.
-      _overlay..opened = newOpened..deliverChanges();
+      _menu..opened = newOpened..deliverChanges();
       _button..active = newOpened..deliverChanges();
       if (newOpened) {
         // Enforce focused state so the button can accept keyboard events.
@@ -105,7 +95,7 @@ class SparkMenuButton extends SparkWidget {
    * Handle the on-opened event from the dropdown. It will be fired e.g. when
    * mouse is clicked outside the dropdown (with autoClosedDisabled == false).
    */
-  void overlayOpenedHandler(CustomEvent e) {
+  void menuOverlayOpenedHandler(CustomEvent e) {
     // Autoclosing is the only event we're interested in.
     if (e.detail == false) {
       _toggle(false);

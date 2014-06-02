@@ -24,33 +24,27 @@
 
 <link rel="import" href="../../../packages/spark_widgets/common/spark_widget.html"/>
 <link rel="import" href="../../../packages/spark_widgets/spark_button/spark_button.html"/>
-<link rel="import" href="../../../packages/spark_widgets/spark_overlay/spark_overlay.html">
-<link rel="import" href="../../../packages/spark_widgets/spark_menu/spark_menu.html"/>
+<link rel="import" href="../../../packages/spark_widgets/spark_menu_box/spark_menu_box.html"/>
 
 <polymer-element name="spark-menu-button" extends="spark-widget"
     attributes="selected
                 valueAttr
                 opened
-                arrow"
-    on-keydown="{{keyDownHandler}}">
-
+                arrow">
   <template>
     <link rel="stylesheet" href="spark_menu_button.css">
 
     <content id="button" select="spark-button"></content>
 
-    <spark-overlay id="overlay"
+    <spark-menu-box id="menu"
+        selected="{{selected}}"
+        valueAttr="{{valueAttr}}"
+        opened="{{opened}}"
         arrow="{{arrow}}"
-        autoClose
-        animation="fade"
-        on-opened="{{overlayOpenedHandler}}">
-      <spark-menu id="menu"
-          selected="{{selected}}"
-          valueAttr="{{valueAttr}}"
-          on-activate="{{menuActivateHandler}}">
-        <content></content>
-      </spark-menu>
-    </spark-overlay>
+        on-activate="{{menuActivateHandler}}"
+        on-opened="{{menuOverlayOpenedHandler}}">
+      <content></content>
+    </spark-menu-box>
   </template>
 
   <script type="application/dart;component=1" src="spark_menu_button.dart"></script>
