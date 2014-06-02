@@ -91,10 +91,6 @@ class SparkSelector extends SparkWidget {
 
     // TODO(terry): Should be onTap when PointerEvents are supported.
     onMouseOver.listen(mouseOverHandler);
-    // TODO(ussuri): BUG #1991. We really want onClick or onMouseUp here, but
-    // both have stopped working ca. 2014-05-20 -- Chrome & Dartium updates may
-    // have played a role, perhaps in combination with Polymer 0.10.0-pre.11.
-    // Investigate later. Baffling, but onMouseDown works.
     onClick.listen(clickHandler);
     onKeyDown.listen(keyDownHandler);
 
