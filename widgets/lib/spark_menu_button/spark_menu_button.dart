@@ -40,7 +40,8 @@ class SparkMenuButton extends SparkWidget {
     _button
         ..onClick.listen(clickHandler)
         ..onFocus.listen(focusHandler)
-        ..onBlur.listen(blurHandler);
+        ..onBlur.listen(blurHandler)
+        ..onKeyDown.listen(keyDownHandler);
   }
 
   /**

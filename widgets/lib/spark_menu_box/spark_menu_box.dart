@@ -4,6 +4,7 @@
 
 library spark_widgets.spark_menu_box;
 
+import 'dart:html';
 
 import 'package:polymer/polymer.dart';
 
@@ -40,5 +41,9 @@ class SparkMenuBox extends SparkWidget {
 
   bool maybeHandleKeyStroke(int keyCode) {
     return _menu.maybeHandleKeyStroke(keyCode);
+  }
+
+  void keyDownHandler(KeyboardEvent e) {
+    maybeHandleKeyStroke(e.keyCode);
   }
 }
