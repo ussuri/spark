@@ -18,6 +18,9 @@ export "spark_icon/spark_icon.dart";
 import "spark_menu/spark_menu.dart";
 export "spark_menu/spark_menu.dart";
 
+import "spark_menu_box/spark_menu_box.dart";
+export "spark_menu_box/spark_menu_box.dart";
+
 import "spark_menu_button/spark_menu_button.dart";
 export "spark_menu_button/spark_menu_button.dart";
 

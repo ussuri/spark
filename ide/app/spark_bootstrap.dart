@@ -16,6 +16,7 @@ import 'package:spark_widgets/spark_dialog_button/spark_dialog_button.dart';
 import 'package:spark_widgets/spark_selection/spark_selection.dart';
 import 'package:spark_widgets/spark_selector/spark_selector.dart';
 import 'package:spark_widgets/spark_menu/spark_menu.dart';
+import 'package:spark_widgets/spark_menu_box/spark_menu_box.dart';
 import 'package:spark_widgets/spark_menu_button/spark_menu_button.dart';
 import 'package:spark_widgets/spark_menu_item/spark_menu_item.dart';
 import 'package:spark_widgets/spark_menu_separator/spark_menu_separator.dart';
@@ -48,6 +49,7 @@ void main() {
   Polymer.register('spark-selection', SparkSelection);
   Polymer.register('spark-selector', SparkSelector);
   Polymer.register('spark-menu', SparkMenu);
+  Polymer.register('spark-menu-box', SparkMenuBox);
   Polymer.register('spark-menu-button', SparkMenuButton);
   Polymer.register('spark-menu-item', SparkMenuItem);
   Polymer.register('spark-menu-separator', SparkMenuSeparator);
