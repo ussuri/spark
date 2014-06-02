@@ -14,9 +14,9 @@ import '../spark_overlay/spark_overlay.dart';
 @CustomTag('spark-menu-box')
 class SparkMenuBox extends SparkWidget {
   @published dynamic selected;
-  @published String valueAttr = '';
+  @published String valueAttr;
   @published bool opened = false;
-  @published String arrow = 'none';
+  @published String arrow;
   static final List<String> _SUPPORTED_ARROWS = [
     'none', 'top-center', 'top-left', 'top-right'
   ];
@@ -39,7 +39,6 @@ class SparkMenuBox extends SparkWidget {
   void resetState() => _menu.resetState();
 
   bool maybeHandleKeyStroke(int keyCode) {
-    print("keyCode: $keyCode");
     return _menu.maybeHandleKeyStroke(keyCode);
   }
 }
