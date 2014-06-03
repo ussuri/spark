@@ -8,6 +8,7 @@ import 'dart:async';
 import 'dart:html';
 
 import 'package:chrome/chrome_app.dart' as chrome;
+import 'package:logging/logging.dart' as logging;
 import 'package:polymer/polymer.dart' as polymer;
 import 'package:spark_widgets/spark_button/spark_button.dart';
 import 'package:spark_widgets/spark_dialog/spark_dialog.dart';
@@ -22,30 +23,8 @@ import 'lib/jobs.dart';
 import 'lib/platform_info.dart';
 import 'lib/workspace.dart' as ws;
 
-class _TimeLogger {
-  final _stepStopwatch = new Stopwatch()..start();
-  final _elapsedStopwatch = new Stopwatch()..start();
-
-  void _log(String type, String message) {
-    // NOTE: standard [Logger] didn't work reliably here.
-    print('[$type] spark.startup: $message');
-  }
-
-  void logStep(String message) {
-    _log('INFO', '$message: ${_stepStopwatch.elapsedMilliseconds}ms.');
-    _stepStopwatch.reset();
-  }
-
-  void logElapsed(String message) {
-    _log('INFO', '$message: ${_elapsedStopwatch.elapsedMilliseconds}ms.');
-  }
-
-  void logError(String error) {
-    _log('ERROR', 'Error: $error');
-  }
-}
-
-final _logger = new _TimeLogger();
+final _rootLogger = new logging.Logger('spark');
+final _logger = new logging.Logger('spark.startup');
 
 @polymer.initMethod
 void main() {
@@ -61,16 +40,18 @@ void main() {
       HttpRequest.getString(chrome.runtime.getURL('user.json'))
   ];
   SparkFlags.initFromFiles(flagsReaders).then((_) {
+
     // Don't set up the zone exception handler if we're running in dev mode.
     final Function maybeRunGuarded =
         SparkFlags.developerMode ? (f) => f() : createSparkZone().runGuarded;
 
     maybeRunGuarded(() {
+      _rootLogger.level = SparkFlags.loggingLevel;
       SparkPolymer spark = new SparkPolymer._();
       spark.start();
     });
   }).catchError((error) {
-    _logger.logError(error);
+    _logger.severe('startup failed', error);
   });
 }
 
@@ -329,8 +310,6 @@ class _SparkSetupParticipant extends LifecycleParticipant {
     final SparkPolymer spark = app;
     spark._ui.modelReady(spark);
     spark.unveil();
-    _logger.logStep('Spark started');
-    _logger.logElapsed('Total startup time');
     return new Future.value();
   }
 

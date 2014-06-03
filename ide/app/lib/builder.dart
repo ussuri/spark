@@ -80,7 +80,10 @@ class BuilderManager {
 
     if (event.isEmpty) return;
 
-    _logger.info('starting build for ${event.changes}');
+    // This log message is very verbose, and doesn't print at the default
+    // logging level. To enable, set the "logging-level" flag in
+    // <workspace>/.spark.json to 500 or lower (see [SparkFlags.loggingLevel]).
+    _logger.fine('starting build for ${event.changes}');
     Stopwatch timer = new Stopwatch()..start();
 
     _buildRunning = true;

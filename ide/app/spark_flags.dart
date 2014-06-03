@@ -7,6 +7,8 @@ library spark.flags;
 import 'dart:async';
 import 'dart:convert' show JSON;
 
+import 'package:logging/logging.dart' as logging;
+
 /**
  * Stores global developer flags.
  */
@@ -17,21 +19,29 @@ class SparkFlags {
    * Accessors to the currently supported flags.
    */
   // NOTE: '...== true' below are on purpose: missing flags default to false.
-  static bool get developerMode => _flags['test-mode'] == true;
-  static bool get useLightAceThemes => _flags['light-ace-themes'] == true;
-  static bool get useDarkAceThemes => _flags['dark-ace-themes'] == true;
+  static bool get developerMode => _getFlag('test-mode');
+  static bool get useLightAceThemes => _getFlag('light-ace-themes');
+  static bool get useDarkAceThemes => _getFlag('dark-ace-themes');
   static bool get useAceThemes => useLightAceThemes || useDarkAceThemes;
-  static bool get showWipProjectTemplates => _flags['wip-project-templates'] == true;
-  static bool get showGitPull => _flags['show-git-pull'] == true;
-  static bool get showGitBranch => _flags['show-git-branch'] == true;
-  static bool get performJavaScriptAnalysis => _flags['analyze-javascript'] == true;
+  static bool get showWipProjectTemplates => _getFlag('wip-project-templates');
+  static bool get showGitPull => _getFlag('show-git-pull');
+  static bool get showGitBranch => _getFlag('show-git-branch');
+  static bool get performJavaScriptAnalysis => _getFlag('analyze-javascript');
   // Bower:
   static bool get bowerMapComplexVerToLatestStable =>
-      _flags['bower-map-complex-ver-to-latest-stable'] == true;
+      _getFlag('bower-map-complex-ver-to-latest-stable');
   static Map<String, String> get bowerOverriddenDeps =>
-      _flags['bower-override-dependencies'];
+      _getFlag('bower-override-dependencies');
   static List<String> get bowerIgnoredDeps =>
-      _flags['bower-ignore-dependencies'];
+      _getFlag('bower-ignore-dependencies');
+  // Logging level is special.
+  static logging.Level get loggingLevel {
+    final name = _getFlag('logging-level', 'INFO');
+    if (name is! String) {
+      throw '"level-name" developer flag should have a string value';
+    }
+    return logging.Level.LEVELS.firstWhere((v) => v.name == name);
+  }
 
   /**
    * Add new flags to the set, possibly overwriting the existing values.
@@ -93,5 +103,10 @@ class SparkFlags {
         return null;
       }
     });
+  }
+
+  static dynamic _getFlag(String name, [dynamic defaultValue = false]) {
+    final value = _flags[name];
+    return value != null ? value : defaultValue;
   }
 }
