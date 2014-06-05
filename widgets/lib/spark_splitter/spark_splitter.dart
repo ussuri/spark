@@ -97,14 +97,14 @@ class SparkSplitter extends SparkWidget {
     }
     classes.toggle('horizontal', _isHorizontal);
     classes.toggle('vertical', !_isHorizontal);
-    _setThickness();
+    _setOwnDimensions();
 
     if (IS_DART2JS) {
       // TODO(ussuri): In deployed code, this is needed to fixate the target's
       // size in case it's not explicitly set by the client and the client
       // changes the target's children later such that the target wants to
       // auto-resize. This prevents auto-resizing. Investigate.
-      _commitTargetSize(_extractTargetSize());
+      _commitTargetSize(_extractTargetSize(_isHorizontal));
     }
   }
 
@@ -113,14 +113,15 @@ class SparkSplitter extends SparkWidget {
     if (targetSize != null) _commitTargetSize(targetSize);
   }
 
-  void _setThickness() {
+  void _setOwnDimensions() {
+    final int targetFixedDim = _extractTargetSize(false);
     final int draggableSize = math.max(size, _MIN_DRAGGABLE_SIZE);
     final int draggableHalfSize = ((draggableSize - size) / 2).ceil();
 
     if (_isHorizontal) {
       style
           ..height = "${size}px"
-          ..width = "auto";
+          ..width = "${targetFixedDim}px";
       _draggable.style
           ..left = "0"
           ..top = "-${draggableHalfSize}px"
@@ -128,7 +129,7 @@ class SparkSplitter extends SparkWidget {
           ..bottom = "-${draggableHalfSize}px";
     } else {
       style
-          ..height = "auto"
+          ..height = "${targetFixedDim}px"
           ..width = "${size}px";
       _draggable.style
           ..left = "-${draggableHalfSize}px"
@@ -138,10 +139,15 @@ class SparkSplitter extends SparkWidget {
     }
   }
 
-  /// Extract the current size of the actual target.
-  int _extractTargetSize() {
-    final style = _target.getComputedStyle();
-    final sizeStr = _isHorizontal ? style.height : style.width;
+  /// Extract the current size of the target.
+  /// [flexDimension] determines which of the dimensions to measure:
+  /// * true = the flexible dimension of the target (one being resized);
+  /// * false: the fixed dimension of the target (one unaffected by resizing).
+  int _extractTargetSize(bool flexDimension) {
+    final CssStyleDeclaration targetStyle = _target.getComputedStyle();
+    final String sizeStr = flexDimension ?
+        (_isHorizontal ? targetStyle.height : targetStyle.width) :
+        (_isHorizontal ? targetStyle.width  : targetStyle.height);
     return int.parse(_sizeRe.firstMatch(sizeStr).group(1));
   }
 
@@ -158,7 +164,7 @@ class SparkSplitter extends SparkWidget {
 
   /// Cache the current actual size of the target.
   void _cacheTargetSize() {
-    _targetSize = _extractTargetSize();
+    _targetSize = _extractTargetSize(true);
   }
 
   /// Update the cached and the actual size of the target.
