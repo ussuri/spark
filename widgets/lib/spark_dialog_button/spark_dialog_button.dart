@@ -19,6 +19,7 @@ class SparkDialogButton extends SparkWidget {
   @published bool cancel = false;
   @published bool dismiss = false;
   @published bool secondary = false;
+  @published bool raised = false;
   @published bool disabled = false;
 
   SparkDialogButton.created() : super.created();
@@ -33,5 +34,22 @@ class SparkDialogButton extends SparkWidget {
     // spark-overlay analyzes all clicks and auto-closes if the clicked
     // element has [overlayToggle] attribute.
     setAttr('overlayToggle', submit || dismiss || cancel);
+  }
+
+  // TODO(ussuri): BUG #2252
+  @override
+  bool deliverChanges() {
+    bool result = super.deliverChanges();
+    SparkWidget widget = getShadowDomElement('spark-button');
+    widget.setAttr('disabled', disabled);
+    return result;
+  }
+
+  void updateParentFormValidity(bool formIsValid) {
+    if (submit) {
+      disabled = !formIsValid;
+      // TODO(ussuri): BUG #2252
+      deliverChanges();
+    }
   }
 }

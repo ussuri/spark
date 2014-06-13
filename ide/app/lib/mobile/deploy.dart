@@ -77,8 +77,9 @@ class MobileDeploy {
    * Important Note: The CRX file that gets created and pushed is not correctly
    * signed and does not include the application's key. Since the target of a
    * push is intended to be a tool like the
-   * [Chrome ADT](https://github.com/MobileChromeApps/harness) on Android,
-   * and that tool doesn't care about the CRX metadata, this is not a problem.
+   * [App Dev Tool](https://github.com/MobileChromeApps/chrome-app-harness)
+   * on Android, and that tool doesn't care about the CRX metadata, this is not
+   * a problem.
    */
   Future pushToHost(String target, ProgressMonitor monitor) {
     monitor.start('Deploying…', 10);
@@ -111,38 +112,22 @@ class MobileDeploy {
   List<int> _buildHttpRequest(String target, List<int> payload) {
     List<int> httpRequest = [];
     // Build the HTTP request headers.
-    String boundary = '--------------------------------a921a8f557cf';
     String header =
-        'POST /push?name=${appContainer.name}&type=crx HTTP/1.1\r\n'
+        'POST /zippush?appId=${appContainer.project.name}&appType=chrome HTTP/1.1\r\n'
         'User-Agent: Spark IDE\r\n'
-        'Host: ${target}:2424\r\n'
-        'Content-Type: multipart/form-data; boundary=$boundary\r\n';
+        'Host: ${target}:2424\r\n';
     List<int> body = [];
-    String bodyTop =
-        '$boundary\r\n'
-        'Content-Disposition: form-data; name="file"; '
-        'filename="SparkPush.crx"\r\n'
-        'Content-Type: application/octet-stream\r\n\r\n';
-    body.addAll(bodyTop.codeUnits);
 
     // Add the CRX headers before the zip content.
     // This is the string "Cr24" then three little-endian 32-bit numbers:
     // - The version (2).
     // - The public key length (0).
     // - The signature length (0).
-    // Since the App Harness/Chrome ADT on the other end doesn't check
+    // Since the App Dev Tool on the other end doesn't check
     // the signature or key, we don't bother sending them.
-    body.addAll([67, 114, 50, 52, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
 
     // Now follows the actual zip data.
     body.addAll(payload);
-
-    // Add the trailing boundary.
-    body.addAll([13, 10]); // \r\n
-    body.addAll(boundary.codeUnits);
-    // Two trailing hyphens to indicate the final boundary.
-    body.addAll([45, 45, 13, 10]); // --\r\n
-
     httpRequest.addAll(header.codeUnits);
     httpRequest.addAll('Content-length: ${body.length}\r\n\r\n'.codeUnits);
     httpRequest.addAll(body);
@@ -153,7 +138,7 @@ class MobileDeploy {
   Future _sendHttpPush(String target, ProgressMonitor monitor) {
     List<int> httpRequest;
     TcpClient client;
-    return archiveContainer(appContainer).then((List<int> archivedData) {
+    return archiveContainer(appContainer, true).then((List<int> archivedData) {
       monitor.worked(3);
       httpRequest = _buildHttpRequest(target, archivedData);
       monitor.worked(5);
@@ -223,8 +208,8 @@ class MobileDeploy {
 
     // Setup port forwarding to 2424 on the device.
     return client.forwardTcp(2424, 2424).then((_) {
-      // TODO: a SocketException, code == -100 here often means that Chrome ADT
-      // is not running on the device.
+      // TODO: a SocketException, code == -100 here often means that the App Dev
+      // Tool is not running on the device.
       // Push the app binary to port 2424.
       return _sendHttpPush('127.0.0.1', monitor);
     });
@@ -235,7 +220,7 @@ class MobileDeploy {
     AndroidDevice _device;
 
     // Build the archive.
-    return archiveContainer(appContainer).then((List<int> archivedData) {
+    return archiveContainer(appContainer, true).then((List<int> archivedData) {
       monitor.worked(3);
       httpRequest = _buildHttpRequest('localhost', archivedData);
       monitor.worked(4);

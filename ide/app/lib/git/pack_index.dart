@@ -57,7 +57,7 @@ class PackIndex {
   static final int FAN_TABLE_LENGTH = 256 * 4;
 
   ByteData _byteData;
-  Uint8List _shaList;
+  List<int> _shaList;
   int _numObjects;
   int _offsetsOffset;
 
@@ -98,7 +98,7 @@ class PackIndex {
 
   int _compareShas(List<int> sha1, List<int> sha2) {
     // assume first byte has been matched in the fan out table.
-    for (var i =1; i < 20; ++i) {
+    for (var i = 1; i < 20; ++i) {
       if (sha1[i] != sha2[i]) {
         return sha1[i] - sha2[i];
       }
@@ -106,7 +106,7 @@ class PackIndex {
     return 0;
   }
 
-  Uint8List _getShaAtIndex(int index) {
+  List<int> _getShaAtIndex(int index) {
     int byteOffset = index * 20;
     return _shaList.sublist(byteOffset, byteOffset + 20);
   }
@@ -224,7 +224,6 @@ class PackIndex {
     indexSha.forEach((int byte) {
       data.setUint8(byteOffset, byte);
     });
-
     return byteList;
   }
 }

@@ -18,7 +18,6 @@ import 'package:logging/logging.dart';
 import 'builder.dart';
 import 'enum.dart';
 import 'jobs.dart';
-import 'package_mgmt/bower_properties.dart';
 import 'package_mgmt/pub_properties.dart';
 import 'preferences.dart';
 import 'utils.dart';
@@ -167,11 +166,11 @@ class Workspace extends Container {
       resource.parent._removeChild(resource, fireEvent: false);
 
       if (newEntry.isFile) {
-        var file = new File(container, newEntry);
+        File file = new File(container, newEntry);
         container.getChildren().add(file);
         return ChangeDelta.containerAdd(file);
       } else {
-        var folder = new Folder(container, newEntry);
+        Folder folder = new Folder(container, newEntry);
         container.getChildren().add(folder);
         return _gatherChildren(folder).then((_) {
           return ChangeDelta.containerAdd(folder);
@@ -260,7 +259,9 @@ class Workspace extends Container {
         }).whenComplete(() {
           _logger.info('Workspace restore took ${stopwatch.elapsedMilliseconds}ms.');
           resumeResourceEvents();
-          _restoreSyncFs();
+          // Disable syncfs projects.
+          // TODO(grv): Re-enable it once the syncfs api is more stable.
+          //_restoreSyncFs();
         }).then((_) => _whenAvailable.complete(this));
       } catch (e) {
         _logger.warning('Exception in workspace restore', e);
@@ -387,8 +388,10 @@ class Workspace extends Container {
     Stopwatch stopwatch = new Stopwatch()..start();
     Completer progressCompleter = new Completer();
 
-    _builderManager.jobManager.schedule(
-        new ProgressJob('Opening sync filesystem…', progressCompleter));
+    ProgressJob progressJob = new ProgressJob(
+        'Opening sync filesystem…', progressCompleter);
+
+    _builderManager.jobManager.schedule(progressJob);
 
     return chrome.syncFileSystem.requestFileSystem().then((/*chrome.FileSystem*/ fs) {
       _syncFileSystem = fs;
@@ -414,7 +417,7 @@ class Workspace extends Container {
     }, onError: (e) {
         _logger.warning('Exception in workspace restore sync file system', e);
     }).timeout(new Duration(seconds: 20)).whenComplete(() {
-      progressCompleter.complete();
+      progressJob.done();
       _whenAvailableSyncFs.complete(this);
     });
   }
@@ -462,10 +465,10 @@ class Workspace extends Container {
     return dir.createReader().readEntries().then((entries) {
       for (chrome.Entry ent in entries) {
         if (ent.isFile) {
-          var file = new File(container, ent);
+          File file = new File(container, ent);
           container.getChildren().add(file);
         } else {
-          var folder = new Folder(container, ent);
+          Folder folder = new Folder(container, ent);
           container.getChildren().add(folder);
           futures.add(_gatherChildren(folder));
         }
@@ -617,12 +620,12 @@ abstract class Resource {
   Future<Map> _rename(String name) {
     return entry.moveTo(_parent._entry, name: name).then((chrome.Entry e) {
       if (e.isFile) {
-        var file = new File(_parent, e);
+        File file = new File(_parent, e);
         _parent.getChildren().add(file);
         _parent.getChildren().remove(this);
         return {'resource': file, 'uuids': _resourceUuids(file)};
       } else {
-        var folder = new Folder(_parent, e);
+        Folder folder = new Folder(_parent, e);
         _parent.getChildren().add(folder);
         _parent.getChildren().remove(this);
         return workspace._gatherChildren(folder).then((_) {
@@ -827,10 +830,9 @@ class Folder extends Container {
    */
   Future<File> importFileEntry(chrome.ChromeFileEntry sourceEntry) {
     return createNewFile(sourceEntry.name).then((File file) {
-      sourceEntry.readBytes().then((chrome.ArrayBuffer buffer) {
-        return file.setBytes(buffer.getBytes());
+      return sourceEntry.readBytes().then((chrome.ArrayBuffer buffer) {
+        return file.setBytes(buffer.getBytes()).then((_) => file);
       });
-      return file;
     });
   }
 
@@ -839,6 +841,12 @@ class Folder extends Container {
    * filesystem to the current folder.
    */
   Future importDirectoryEntry(chrome.DirectoryEntry entry) {
+
+    if (entry.fullPath == _dirEntry.fullPath) {
+      // TODO(grv): Wrap into a spark exception.
+      return new Future.error('Import and root folder are same.');
+    }
+
     return createNewFolder(entry.name).then((Folder folder) {
       return entry.createReader().readEntries().then((List<chrome.Entry> entries) {
         List<Future> futures = [];
@@ -879,7 +887,7 @@ class Folder extends Container {
 
   bool isDerived() {
     // TODO(devoncarew): 'cache' is a temporay folder - it will be removed.
-    if ((name == 'build' || name == 'cache' || name == bowerProperties.packagesDirName) &&
+    if ((name == 'build' || name == 'cache') &&
         parent is Project) {
       return true;
     } else {
@@ -1339,7 +1347,7 @@ class ResourceChangeEvent {
   Iterable<Project> get modifiedProjects => changes
       .map((delta) => delta.resource.project)
       .toSet()
-      .where((project) => project != null);
+      .where((Project project) => project != null);
 
   List<ChangeDelta> getChangesFor(Project project) {
     return changes.where((c) => c.resource.project == project).toList();

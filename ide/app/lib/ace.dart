@@ -30,7 +30,7 @@ import 'utils.dart' as utils;
 import 'workspace.dart' as workspace;
 import 'services.dart' as svc;
 import 'outline.dart';
-import 'ui/polymer/goto_line_view/goto_line_view.dart';
+import 'ui/goto_line_view/goto_line_view.dart';
 import 'utils.dart';
 
 export 'package:ace/ace.dart' show EditSession;
@@ -64,6 +64,9 @@ class TextEditor extends Editor {
     if (MarkdownEditor.isMarkdownFile(file)) {
       return new MarkdownEditor._create(aceManager, file, prefs);
     }
+    if (HtmlEditor.isHtmlFile(file)) {
+      return new HtmlEditor._create(aceManager, file, prefs);
+    }
     return new TextEditor._create(aceManager, file, prefs);
   }
 
@@ -96,7 +99,7 @@ class TextEditor extends Editor {
   html.Element get element => aceManager.parentElement;
 
   void activate() {
-    aceManager.outline.visible = supportsOutline;
+    _outline.visible = supportsOutline;
     aceManager._aceEditor.readOnly = readOnly;
   }
 
@@ -105,7 +108,9 @@ class TextEditor extends Editor {
    */
   void reconcile() { }
 
-  void deactivate() { }
+  void deactivate() {
+    if (supportsOutline && _outline.visible) _outline.visible = false;
+  }
 
   void resize() => aceManager.resize();
 
@@ -136,7 +141,8 @@ class TextEditor extends Editor {
 
   void format() { }
 
-  Future navigateToDeclaration([Duration timeLimit]) => new Future.value();
+  Future navigateToDeclaration([Duration timeLimit]) =>
+      new Future.value(svc.Declaration.EMPTY_DECLARATION);
 
   void fileContentsChanged() {
     if (_session != null) {
@@ -175,6 +181,9 @@ class TextEditor extends Editor {
     }
   }
 
+  int getCursorOffset() => _session.document.positionToIndex(
+      aceManager._aceEditor.cursorPosition);
+
   /**
    * Replace the editor's contents with the given text. Make sure that we don't
    * fire a change event.
@@ -204,6 +213,8 @@ class TextEditor extends Editor {
   void _invokeReconcile() {
     reconcile();
   }
+
+  Outline get _outline => aceManager.outline;
 }
 
 class DartEditor extends TextEditor {
@@ -241,18 +252,16 @@ class DartEditor extends TextEditor {
     });
   }
 
-  Outline get _outline => aceManager.outline;
-
   Future<svc.Declaration> navigateToDeclaration([Duration timeLimit]) {
-    int offset = _session.document.positionToIndex(
-        aceManager._aceEditor.cursorPosition);
+    int offset = getCursorOffset();
 
     Future declarationFuture = aceManager._analysisService.getDeclarationFor(
         file, offset);
 
     if (timeLimit != null) {
-      declarationFuture = declarationFuture.timeout(timeLimit, onTimeout: () =>
-          throw new TimeoutException("navigateToDeclaration timed out"));
+      declarationFuture = declarationFuture.timeout(timeLimit, onTimeout: () {
+        throw new TimeoutException("navigateToDeclaration timed out");
+      });
     }
 
     return declarationFuture.then((svc.Declaration declaration) {
@@ -290,6 +299,29 @@ class CssEditor extends TextEditor {
       dirty = true;
     }
   }
+
+  /**
+   * Handle navigating to file references in strings. So, things like:
+   *
+   *     @import url("packages/bootjack/css/bootstrap.min.css");
+   */
+  Future<svc.Declaration> navigateToDeclaration([Duration timeLimit]) {
+    if (file.parent == null) {
+      return new Future.value(svc.Declaration.EMPTY_DECLARATION);
+    }
+
+    String path = _getQuotedString(_session.value, getCursorOffset());
+    if (path == null) return new Future.value(svc.Declaration.EMPTY_DECLARATION);
+
+    workspace.File targetFile = _resolvePath(file, path);
+
+    if (targetFile != null) {
+      aceManager.delegate.openEditor(targetFile);
+      return new Future.value(new svc.FileDeclaration(targetFile));
+    } else {
+      return new Future.value();
+    }
+  }
 }
 
 class MarkdownEditor extends TextEditor {
@@ -321,6 +353,38 @@ class MarkdownEditor extends TextEditor {
   }
 }
 
+class HtmlEditor extends TextEditor {
+  static bool isHtmlFile(workspace.File file) =>
+      file.name.endsWith('.htm') || file.name.endsWith('.html');
+
+  HtmlEditor._create(AceManager aceManager, workspace.File file,
+    SparkPreferences prefs) : super._create(aceManager, file, prefs);
+
+  /**
+   * Handle navigating to file references in strings. So, things like the href
+   * in:
+   *
+   *     <link rel="import" href="spark_polymer_ui.html">
+   */
+  Future<svc.Declaration> navigateToDeclaration([Duration timeLimit]) {
+    if (file.parent == null) {
+      return new Future.value(svc.Declaration.EMPTY_DECLARATION);
+    }
+
+    String path = _getQuotedString(_session.value, getCursorOffset());
+    if (path == null) return new Future.value(svc.Declaration.EMPTY_DECLARATION);
+
+    workspace.File targetFile = _resolvePath(file, path);
+
+    if (targetFile != null) {
+      aceManager.delegate.openEditor(targetFile);
+      return new Future.value(new svc.FileDeclaration(targetFile));
+    } else {
+      return new Future.value();
+    }
+  }
+}
+
 /**
  * A wrapper around an Ace editor instance.
  */
@@ -332,6 +396,7 @@ class AceManager {
    */
   final html.Element parentElement;
   final AceManagerDelegate delegate;
+  final SparkPreferences _prefs;
 
   Outline outline;
 
@@ -355,7 +420,7 @@ class AceManager {
   AceManager(this.parentElement,
              this.delegate,
              svc.Services services,
-             PreferenceStore prefs) {
+             this._prefs) {
     ace.implementation = ACE_PROXY_IMPLEMENTATION;
     _aceEditor = ace.edit(parentElement);
     _aceEditor.renderer.fixedWidthGutter = true;
@@ -369,8 +434,8 @@ class AceManager {
     // Enable code completion.
     ace.require('ace/ext/language_tools');
     _aceEditor.setOption('enableBasicAutocompletion', true);
-    _aceEditor.setOption('enableSnippets', true);
-    _aceEditor.setOption('enableMultiselect', false);
+    // TODO(devoncarew): Disabled to workaround #2442.
+    //_aceEditor.setOption('enableSnippets', true);
 
     // Override Ace's `gotoline` command.
     var command = new ace.Command(
@@ -404,19 +469,22 @@ class AceManager {
     ace.Mode.extensionMap['nmf'] = ace.Mode.JSON;
     ace.Mode.extensionMap['project'] = ace.Mode.XML;
 
-    _setupOutline(prefs);
     _setupGotoLine();
 
-    var node = parentElement.getElementsByClassName("ace_content")[0];
-    node.onClick.listen((e) {
-      bool accelKey = PlatformInfo.isMac ? e.metaKey : e.ctrlKey;
-      if (accelKey) _onGotoDeclarationController.add(null);
-    });
+    _aceEditor.setOption('enableMultiselect', SparkFlags.enableMultiSelect);
+    if (!SparkFlags.enableMultiSelect) {
+      // Setup ACCEL + clicking on declaration
+      var node = parentElement.getElementsByClassName("ace_content")[0];
+      node.onClick.listen((e) {
+        bool accelKey = PlatformInfo.isMac ? e.metaKey : e.ctrlKey;
+        if (accelKey) _onGotoDeclarationController.add(null);
+      });
+    }
   }
 
-  void _setupOutline(PreferenceStore prefs) {
-    outline = new Outline(_analysisService, parentElement, prefs);
-
+  void setupOutline(html.Element parentElement) {
+    outline = new Outline(_analysisService, parentElement, _prefs.prefStore);
+    outline.visible = false;
     outline.onChildSelected.listen((OutlineItem item) {
       ace.Point startPoint =
           currentSession.document.indexToPosition(item.nameStartOffset);
@@ -923,4 +991,59 @@ String _calcMD5(String text) {
   crypto.MD5 md5 = new crypto.MD5();
   md5.add(text.codeUnits);
   return crypto.CryptoUtils.bytesToHex(md5.close());
+}
+
+/**
+ * Given some arbitrary text and an offset into it, attempt to return the
+ * parts of the offset surrounded by quotes.
+ */
+String _getQuotedString(String text, int offset) {
+  int leftSide = offset;
+
+  while (leftSide >= 0) {
+    String c = text[leftSide];
+    if (c == '\n' || leftSide == 0) return null;
+    if (c == "'" || c == '"') break;
+    leftSide--;
+  }
+
+  leftSide++;
+  int rightSide = offset;
+
+  while ((rightSide + 1) < text.length) {
+    String c = text[rightSide];
+    if (c == "'" || c == '"') {
+      rightSide--;
+      break;
+    }
+    if (c == '\n') break;
+    rightSide++;
+  }
+
+  return text.substring(leftSide, rightSide + 1);
+}
+
+/**
+ * Given a file and a relative path from it, resolve the target file. Can
+ * return `null`.
+ */
+workspace.File _resolvePath(workspace.File file, String path) {
+  return _resolvePaths(file.parent, path.split('/'));
+}
+
+workspace.File _resolvePaths(workspace.Container container,
+                             Iterable<String> pathElements) {
+  if (pathElements.isEmpty || container == null) return null;
+
+  String element = pathElements.first;
+
+  if (pathElements.length == 1) {
+    return container.getChild(element);
+  }
+
+  if (element == '..') {
+    return _resolvePaths(container.parent, pathElements.skip(1));
+  } else {
+    return _resolvePaths(container.getChild(element), pathElements.skip(1));
+  }
 }

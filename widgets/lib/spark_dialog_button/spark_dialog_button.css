@@ -5,4 +5,10 @@
 @import url("../common/spark_widget.css");
 
 :host {
+  font-family: inherit;
+  font-weight: 500;
+}
+
+:host([disabled]) {
+  pointer-events: none !important;
 }

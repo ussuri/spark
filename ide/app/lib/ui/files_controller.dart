@@ -13,7 +13,7 @@ import 'dart:html' as html;
 
 import 'package:bootjack/bootjack.dart' as bootjack;
 
-import 'utils/html_utils.dart';
+import 'html_utils.dart';
 import 'widgets/file_item_cell.dart';
 import 'widgets/listview_cell.dart';
 import 'widgets/treeview.dart';
@@ -208,7 +208,12 @@ class FilesController implements TreeViewDelegate {
 
   int treeViewHeightForNode(TreeView view, String nodeUid) {
     Resource resource = _filesMap[nodeUid];
-    return resource is Project ? 40 : 20;
+    return resource is Project ? 40 : 24;
+  }
+
+  int treeViewDisclosurePositionForNode(TreeView view, String nodeUid) {
+    Resource resource = _filesMap[nodeUid];
+    return resource is Project ? 15 : -1;
   }
 
   void treeViewSelectedChanged(TreeView view, List<String> nodeUids) {
@@ -790,9 +795,8 @@ class FilesController implements TreeViewDelegate {
     if (scmOperations != null) {
       if (resource is Project) {
         String branchName = scmOperations.getBranchName();
-        final String repoIcon = '<span class="glyphicon glyphicon-random small"></span>';
         if (branchName == null) branchName = '';
-        fileItemCell.setFileInfo('${repoIcon} [${branchName}]');
+        fileItemCell.setFileInfo('[${branchName}]');
       }
 
       ScmFileStatus status = scmOperations.getFileStatus(resource);

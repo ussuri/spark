@@ -174,9 +174,13 @@ abstract class ScmProjectOperations {
 
   Stream<ScmProjectOperations> get onStatusChange;
 
-  Future<List<String>> getAllBranchNames();
+  Future<List<String>> getLocalBranchNames();
 
-  Future createBranch(String branchName);
+  Future<Iterable<String>> getRemoteBranchNames();
+
+  Future<Iterable<String>> getUpdatedRemoteBranchNames();
+
+  Future createBranch(String branchName, String sourceBranchName);
 
   Future checkoutBranch(String branchName);
 
@@ -362,14 +366,33 @@ class GitScmProjectOperations extends ScmProjectOperations {
 
   Stream<ScmProjectOperations> get onStatusChange => _statusController.stream;
 
-  Future<List<String>> getAllBranchNames() =>
+  Future<List<String>> getLocalBranchNames() =>
       objectStore.then((store) => store.getLocalBranches());
 
-  Future createBranch(String branchName) {
+  Future<Iterable<String>> getRemoteBranchNames()  {
+    return objectStore.then((store) {
+      return store.getRemoteHeads().then((result) {
+        GitOptions options = new GitOptions(root: entry, store: store);
+        // Return immediately but requet async update.
+        // TODO(grv): wait for it when, the UI support refreshing remote branches.
+        Fetch.updateAndGetRemoteRefs(options);
+        return result;
+      });
+    });
+  }
+
+  Future<Iterable<String>> getUpdatedRemoteBranchNames()  {
+    return objectStore.then((store) {
+      GitOptions options = new GitOptions(root: entry, store: store);
+      return Fetch.updateAndGetRemoteRefs(options);
+    });
+  }
+
+  Future createBranch(String branchName, String sourceBranchName) {
     return objectStore.then((store) {
       GitOptions options = new GitOptions(
           root: entry, branchName: branchName, store: store);
-      return Branch.branch(options);
+      return Branch.branch(options, sourceBranchName);
     });
   }
 
@@ -388,7 +411,7 @@ class GitScmProjectOperations extends ScmProjectOperations {
   }
 
   void markResolved(Resource resource) {
-    // TODO: implement
+    // TODO(grv): Implement
     _logger.info('Implement markResolved()');
 
     // When finished, fire an SCM changed event.
@@ -437,7 +460,13 @@ class GitScmProjectOperations extends ScmProjectOperations {
     return objectStore.then((store) {
       GitOptions options = new GitOptions(root: entry, store: store);
       Pull pull = new Pull(options);
-      return pull.pull();
+      return pull.pull().then((_) {
+        _statusController.add(this);
+
+        // We changed files on disk - let the workspace know to re-scan the
+        // project and fire any necessary resource change events.
+        Timer.run(() => project.refresh());
+      });
     });
   }
 
@@ -452,9 +481,10 @@ class GitScmProjectOperations extends ScmProjectOperations {
     });
   }
 
-  Future<List<CommitInfo>> getPendingCommits() {
+  Future<List<CommitInfo>> getPendingCommits(String username, String password) {
     return objectStore.then((store) {
-      GitOptions options = new GitOptions(root: entry, store: store);
+      GitOptions options = new GitOptions(root: entry, store: store,
+          username: username, password: password);
       return Push.getPendingCommits(options).then((List commits) {
         return commits.map((CommitObject item) {
           CommitInfo result = new CommitInfo();

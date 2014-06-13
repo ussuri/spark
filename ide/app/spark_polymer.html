@@ -28,11 +28,6 @@
 
   <!-- JSHint includes -->
   <script src="third_party/jshint/jshint.js"></script>
-
-  <!-- Git includes -->
-  <script src="git/third_party/zlib_inflate.js"></script>
-  <script src="git/third_party/zlib_deflate.js"></script>
-  <script src="git/third_party/diff3.js"></script>
 </head>
 
 <body>
@@ -64,7 +59,7 @@
 
   <!-- Template for Outline -->
   <template id="outline-template" >
-    <div id="outline">
+    <div id="outline" class="scrollbar-dark">
       <ul></ul>
     </div>
   </template>
@@ -73,7 +68,7 @@
       <span class="glyphicon glyphicon-list"></span>
     </button>
   </template>
-  
+
   <!-- Markdown template -->
   <template id="markdown-template" >
     <div id="markdownContent">
