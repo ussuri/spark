@@ -33,25 +33,33 @@ class SparkException implements Exception {
   }
 
   static SparkException _fromGitException(GitException e) {
-    if (e.errorCode == GitErrorConstants.GIT_AUTH_REQUIRED) {
-      return new SparkException(e.toString(),
-            SparkErrorConstants.AUTH_REQUIRED);
-    } else if (e.errorCode == GitErrorConstants.GIT_HTTP_FORBIDDEN_ERROR) {
-      return new SparkException(e.toString(),
-             SparkErrorConstants.GIT_HTTP_FORBIDDEN_ERROR);
-    } else if (e.errorCode == GitErrorConstants.GIT_CLONE_CANCEL) {
-      return new SparkException(e.toString(),
-        SparkErrorConstants.GIT_CLONE_CANCEL, true);
-    } else if (e.errorCode
-        == GitErrorConstants.GIT_SUBMODULES_NOT_YET_SUPPORTED)  {
-      return new SparkException(e.toString(),
-        SparkErrorConstants.GIT_SUBMODULES_NOT_YET_SUPPORTED);
-    } else if (e.errorCode == SparkErrorConstants.GIT_PUSH_NON_FAST_FORWARD) {
-      return new SparkException(SparkErrorMessages.GIT_PUSH_NON_FAST_FORWARD_MSG,
-        SparkErrorConstants.GIT_PUSH_NON_FAST_FORWARD);
-    } else {
-      return new SparkException(e.toString());
+    switch (e.errorCode) {
+      case GitErrorConstants.GIT_AUTH_REQUIRED:
+        return new SparkException(e.toString(), SparkErrorConstants.AUTH_REQUIRED);
+
+      case GitErrorConstants.GIT_HTTP_FORBIDDEN_ERROR:
+        return new SparkException(
+            e.toString(), SparkErrorConstants.GIT_HTTP_FORBIDDEN_ERROR);
+
+      case GitErrorConstants.GIT_CLONE_CANCEL:
+        return new SparkException(
+            e.toString(), SparkErrorConstants.GIT_CLONE_CANCEL, true);
+
+      case GitErrorConstants.GIT_SUBMODULES_NOT_YET_SUPPORTED:
+        return new SparkException(
+            SparkErrorMessages.GIT_SUBMODULES_NOT_YET_SUPPORTED_MSG,
+            SparkErrorConstants.GIT_SUBMODULES_NOT_YET_SUPPORTED);
+
+      case GitErrorConstants.GIT_PUSH_NON_FAST_FORWARD:
+        return new SparkException(SparkErrorMessages.GIT_PUSH_NON_FAST_FORWARD_MSG,
+            SparkErrorConstants.GIT_PUSH_NON_FAST_FORWARD);
+
+      case GitErrorConstants.GIT_HTTP_CONN_RESET:
+        return new SparkException(SparkErrorMessages.GIT_HTTP_CONN_REST_MSG,
+            SparkErrorConstants.GIT_HTTP_CONN_RESET);
+
     }
+    return new SparkException(e.toString());
   }
 
   String toString() => errorCode == null ?
@@ -66,6 +74,7 @@ class SparkErrorConstants {
   static final String BRANCH_NOT_FOUND = "branch_not_found";
   static final String GIT_CLONE_DIR_IN_USE = "git.clone_dir_in_use";
   static final String AUTH_REQUIRED = "auth.required";
+  static final String GIT_HTTP_CONN_RESET = "git.http_conn_reset";
   static final String GIT_CLONE_CANCEL = "git.clone_cancel";
   static final String GIT_SUBMODULES_NOT_YET_SUPPORTED
       = "git.submodules_not_yet_supported";
@@ -77,4 +86,8 @@ class SparkErrorConstants {
 class SparkErrorMessages {
   static final String GIT_PUSH_NON_FAST_FORWARD_MSG
       = 'Non fast-forward push is not yet supported.';
+  static final String GIT_SUBMODULES_NOT_YET_SUPPORTED_MSG
+      = 'Repositories with sub modules are not yet supported.';
+  static final String GIT_HTTP_CONN_REST_MSG  = 'The connection was reset by '
+      'the server. This may happen when pushing commits with large changes.';
 }
