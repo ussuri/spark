@@ -138,7 +138,7 @@
   padding: 11px;
 }
 
-#button:focus #focusBg {
+:host(:not([disabled])) #button:focus #focusBg {
   -webkit-transition: none;
   transition: none;
   -webkit-animation: focus-fade 0.7s infinite alternate;
