@@ -232,8 +232,8 @@ class SparkOverlay extends SparkWidget {
 
   void _enableResizeHandler(bool enable) {
     if (enable) {
-      _resizeSubscription =
-          SparkWidget.addEventHandlers(window, ['resize'], _resizeHandlerInst);
+      _resizeSubscription = SparkWidget.addEventHandlers(
+          window, ['resize'], _resizeHandlerInst);
     } else {
       SparkWidget.removeEventHandlers(_resizeSubscription);
     }
@@ -241,7 +241,7 @@ class SparkOverlay extends SparkWidget {
 
   void _enableCaptureHandlers(bool enable, Iterable<String> eventTypes) {
     if (enable) {
-      _captureSubscriptions = SparkWidget.addRemoveEventHandlers(
+      _captureSubscriptions = SparkWidget.addEventHandlers(
           document, eventTypes, _captureHandlerInst, capture: true);
     } else {
       SparkWidget.removeEventHandlers(_captureSubscriptions);
