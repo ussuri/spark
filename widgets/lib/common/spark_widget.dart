@@ -4,6 +4,7 @@
 
 library spark_widgets;
 
+import 'dart:async';
 import 'dart:html';
 
 import 'package:polymer/polymer.dart';
@@ -51,7 +52,7 @@ class SparkWidget extends PolymerElement {
     // instantiates other widgets and passes some focusable nodes to them
     // via <content>. So for now just print a warning and return first element.
     if (elts.length > 1) {
-      print("WARNING: more than one child with 'focused' attribute");
+      print("WARNING: $runtimeType #$id has > 1 child with 'focused' attribute");
     }
     return elts.first;
   }
@@ -145,15 +146,25 @@ class SparkWidget extends PolymerElement {
         shadowRoot.contains(e.target);
   }
 
-  static void addRemoveEventHandlers(
+  static Map<String, StreamSubscription> addEventHandlers(
       dynamic node,
       Iterable<String> eventTypes,
       Function handler,
       {bool enable: true,
        bool capture: false}) {
-    final Function addRemoveFunc =
-        enable ? node.addEventListener : node.removeEventListener;
-    eventTypes.forEach((event) => addRemoveFunc(event, handler, capture));
+    Map<String, StreamSubscription> subs = {};
+    eventTypes.forEach((event) {
+      if (capture) {
+        subs[event] = node.on[event].capture(handler);
+      } else {
+        subs[event] = node.on[event].listen(handler);
+      }
+    });
+    return subs;
+  }
+
+  static void removeEventHandlers(Map<String, StreamSubscription> subs) {
+    subs.forEach((event, sub) => sub.cancel());
   }
 
   /**

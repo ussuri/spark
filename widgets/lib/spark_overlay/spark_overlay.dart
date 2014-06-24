@@ -168,7 +168,9 @@ class SparkOverlay extends SparkWidget {
   // Function closures aren't canonicalized: need to have one pointer for the
   // listener's handler that is added/removed.
   EventListener _captureHandlerInst;
+  Map<String, StreamSubscription> _captureSubscriptions;
   EventListener _resizeHandlerInst;
+  Map<String, StreamSubscription> _resizeSubscription;
 
   SparkOverlay.created(): super.created() {
     _captureHandlerInst = _captureHandler;
@@ -189,14 +191,13 @@ class SparkOverlay extends SparkWidget {
     // E.g. try to open and close the menu and click in the area where it was.
     // enableKeyboardEvents();
 
-    addEventListener('webkitAnimationStart', _openedAnimationStart);
-    addEventListener('animationStart', _openedAnimationStart);
-    addEventListener('webkitAnimationEnd', _openedAnimationEnd);
-    addEventListener('animationEnd', _openedAnimationEnd);
-    addEventListener('webkitTransitionEnd', _openedTransitionEnd);
-    addEventListener('transitionEnd', _openedTransitionEnd);
-    addEventListener('click', _tapHandler);
-    addEventListener('keydown', _keyDownHandler);
+    on['webkitAnimationStart'].listen(_openedAnimationStart);
+    on['animationStart'].listen(_openedAnimationStart);
+    on['webkitAnimationEnd'].listen(_openedAnimationEnd);
+    on['animationEnd'].listen(_openedAnimationEnd);
+    onTransitionEnd.listen(_openedTransitionEnd);
+    onClick.listen(_tapHandler);
+    onKeyDown.listen(_keyDownHandler);
   }
 
   void show() {
@@ -223,20 +224,28 @@ class SparkOverlay extends SparkWidget {
       var eventTypes = new Set<String>();
       if (modal) eventTypes.addAll(_modalEventTypes);
       if (autoClose) eventTypes.addAll(_autoCloseEventTypes);
-      _enableCaptureHandler(opened, eventTypes);
+      _enableCaptureHandlers(opened, eventTypes);
     }
 
     asyncFire('opened', detail: opened);
   }
 
   void _enableResizeHandler(bool enable) {
-    SparkWidget.addRemoveEventHandlers(
-        window, ['resize'], _resizeHandlerInst, enable: enable);
+    if (enable) {
+      _resizeSubscription =
+          SparkWidget.addEventHandlers(window, ['resize'], _resizeHandlerInst);
+    } else {
+      SparkWidget.removeEventHandlers(_resizeSubscription);
+    }
   }
 
-  void _enableCaptureHandler(bool enable, Iterable<String> eventTypes) {
-    SparkWidget.addRemoveEventHandlers(
-        document, eventTypes, _captureHandlerInst, enable: enable, capture: true);
+  void _enableCaptureHandlers(bool enable, Iterable<String> eventTypes) {
+    if (enable) {
+      _captureSubscriptions = SparkWidget.addRemoveEventHandlers(
+          document, eventTypes, _captureHandlerInst, capture: true);
+    } else {
+      SparkWidget.removeEventHandlers(_captureSubscriptions);
+    }
   }
 
   void _applyFocus() {
