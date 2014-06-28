@@ -28,7 +28,7 @@ const bool IS_DART2JS = identical(1, 1.0);
  *         ...
  *           <x-element attr="{{attr2}}">
  */
-const published_reflected = const PublishedProperty(reflect: true);
+const attribute = const PublishedProperty(reflect: true);
 
 /**
  * A common base for all the widgets, internal and external.

@@ -42,31 +42,27 @@ import '../spark_selection/spark_selection.dart';
 @CustomTag("spark-selector")
 class SparkSelector extends SparkWidget {
   /// If true, multiple selections are allowed.
-  @published bool multi = false;
-
+  @attribute bool multi = false;
   /// The IDs of the initially selected element ([multi]==false) or
   /// a space-separated list of the initially selected elements
   /// ([multi]==true). An ID can be either the element's 0-based index or
   /// the element's value as determined by the [valueAttr] property.
   /// [selected] can also be externally set after the initial instantiation
   /// to force a particular selection.
-  @published dynamic inSelection;
-
+  @attribute dynamic inSelection;
   /// The attribute to be used as an item's "value".
-  @published String valueAttr;
-
+  @attribute String valueAttr;
   /// The CSS selector to choose the selectable subset of elements passed from
   /// the light DOM into the <content> insertion point.
-  @published String itemFilter = '*';
-
+  @attribute String itemFilter = '*';
   /// The CSS class to add to an active element (hovered/selected via keyboard).
-  @published String activeClass = '';
+  @attribute String activeClass = '';
   /// The attribute to add to an active element (hovered/selected via keyboard).
-  @published String activeAttr = '';
+  @attribute String activeAttr = '';
   /// The CSS class to add to a selected element.
-  @published String selectedClass = '';
+  @attribute String selectedClass = '';
   /// The attribute to set on a selected element.
-  @published String selectedAttr = '';
+  @attribute String selectedAttr = '';
 
   SparkSelection selection;
 

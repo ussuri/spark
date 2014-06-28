@@ -28,10 +28,10 @@ import '../common/spark_widget.dart';
  */
 @CustomTag('spark-status')
 class SparkStatus extends SparkWidget {
-  bool _spinning = false;
-  String _defaultMessage;
-  String _progressMessage;
-  String _temporaryMessage;
+  @attribute bool spinning = false;
+  @attribute String defaultMessage;
+  @attribute String progressMessage;
+  @attribute String temporaryMessage;
 
   Element _label;
   Element _throbber;

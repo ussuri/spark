@@ -10,7 +10,7 @@ import '../common/spark_widget.dart';
 
 @CustomTag("spark-selection")
 class SparkSelection extends SparkWidget {
-  @published bool multi = false;
+  @attribute bool multi = false;
 
   final Set<dynamic> _selection = new Set<dynamic>();
 
@@ -30,7 +30,6 @@ class SparkSelection extends SparkWidget {
       _selection.remove(value);
     }
 
-    // TODO(sjmiles): consider replacing with summary notifications (async job).
     asyncFire('select', detail: {'value': value, 'isSelected': isSelected});
   }
 

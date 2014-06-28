@@ -47,7 +47,7 @@ class SparkProgress extends SparkWidget {
   }
 
   /// Whether the progress component should be indeterminate or not.
-  @published bool indeterminate = false;
+  @attribute bool indeterminate = false;
 
   void indeterminateChanged() {
     if (_progressDiv != null) {
@@ -57,13 +57,13 @@ class SparkProgress extends SparkWidget {
   }
 
   /// Whether to display a textual progress message.
-  @published bool showProgressMessage = false;
+  @attribute bool showProgressMessage = false;
 
   /// The textual progress message.
-  @published String progressMessage = ' ';
+  @attribute String progressMessage = ' ';
 
   /// Whether to show a cancel button.
-  @published bool showCancel = false;
+  @attribute bool showCancel = false;
 
   SparkProgress.created() : super.created();
 

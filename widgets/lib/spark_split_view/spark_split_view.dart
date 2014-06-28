@@ -15,13 +15,13 @@ import '../spark_splitter/spark_splitter.dart';
 class SparkSplitView extends SparkWidget {
   /// These are just wires into the enclosed [SparkSplitter]. See that class
   /// for the description of the attributes.
-  @published String direction = 'left';
-  @published int splitterSize = 8;
-  @published bool splitterHandle = true;
-  @published int targetSize;
-  @published int minTargetSize = 0;
-  @published int maxTargetSize = 100000;
-  @published bool locked = false;
+  @attribute String direction = 'left';
+  @attribute int splitterSize = 8;
+  @attribute bool splitterHandle = true;
+  @attribute int targetSize;
+  @attribute int minTargetSize = 0;
+  @attribute int maxTargetSize = 100000;
+  @attribute bool locked = false;
 
   SparkSplitter _splitter;
 
@@ -42,16 +42,6 @@ class SparkSplitView extends SparkWidget {
            )
     );
     _splitter = $['splitter'];
-  }
-
-  void targetSizeChanged() {
-    // TODO(ussuri): This was critical for correct propagation of the client's
-    // changes in [targetSize] to the enclosed splitter. Investigate.
-    _splitter.targetSize = targetSize;
-    if (IS_DART2JS) {
-      // TODO(ussuri): In the deployed code, even the above wasn't enough.
-      _splitter.targetSizeChanged();
-    }
   }
 
   /**

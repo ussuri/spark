@@ -12,12 +12,10 @@ import '../common/spark_widget.dart';
 @CustomTag("spark-icon")
 class SparkIcon extends SparkWidget {
   /// URL of an image for the icon.
-  @published String src = "";
-
+  @attribute String src = "";
   /// Size of the icon.
-  @published String size = '24px';
-
-  @published String tooltip = "";
+  @attribute String size = '24px';
+  @attribute String tooltip = "";
 
   SparkIcon.created(): super.created();
 }

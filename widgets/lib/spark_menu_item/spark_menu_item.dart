@@ -13,16 +13,13 @@ import '../common/spark_widget.dart';
 @CustomTag("spark-menu-item")
 class SparkMenuItem extends SparkWidget {
   /// URL image for the icon associated with this menu item.
-  @published String icon = "";
-
+  @attribute String icon = "";
   /// Size of the icon.
-  @published String iconSize = '24px';
-
+  @attribute String iconSize = '24px';
   /// Specifies the label for the menu item.
-  @published String label = "";
-
+  @attribute String label = "";
   /// Description for this menu, usually used for a keybinding description.
-  @published String description = "";
+  @attribute String description = "";
 
   SparkMenuItem.created(): super.created();
 

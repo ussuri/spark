@@ -13,14 +13,14 @@ import '../common/spark_widget.dart';
 @CustomTag('spark-button')
 class SparkButton extends SparkWidget {
   // [flat] is the default.
-  @published bool flat;
-  @published bool raised;
-  @published bool round;
-  @published bool primary;
-  @published String padding;
-  @published bool disabled;
-  @published bool active;
-  @published String tooltip;
+  @attribute bool flat;
+  @attribute bool raised;
+  @attribute bool round;
+  @attribute bool primary;
+  @attribute String padding;
+  @attribute bool disabled;
+  @attribute bool active;
+  @attribute String tooltip;
 
   SparkButton.created() : super.created();
 

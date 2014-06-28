@@ -15,25 +15,20 @@ import '../spark_modal/spark_modal.dart';
 
 @CustomTag('spark-dialog')
 class SparkDialog extends SparkWidget {
-  // TODO(ussuri): Replace with a regular published property (BUG #2252).
   /**
    * The title of the dialog.
    */
-  @published String get headerTitle => _headerTitle;
-  @published set headerTitle(String value) {
-    _headerTitle = value;
-    if (_headerTitleElement != null) _headerTitleElement.text = value;
-  }
+  @attribute String headerTitle = '';
 
   /**
    * Do not show the closing X button at top-right corner
    */
-  @published bool noClosingX = false;
+  @attribute bool noClosingX = false;
 
   /**
    * The kind of animation that the overlay should perform on open/close.
    */
-  @published String animation = 'scale-slideup';
+  @attribute String animation = 'scale-slideup';
 
   bool _activityVisible = false;
 
@@ -148,13 +143,13 @@ class _ValidatedField {
     // include [value], because [value] is special (not a pure attribute).
     _observer = new MutationObserver((records, _) => _updateValidity(records));
     _observer.observe(
-            _element,
-            childList: false,
-            attributes: true,
-            characterData: true,
-            subtree: false,
-            attributeOldValue: false,
-            characterDataOldValue: false);
+        _element,
+        childList: false,
+        attributes: true,
+        characterData: true,
+        subtree: false,
+        attributeOldValue: false,
+        characterDataOldValue: false);
   }
 
   void cleanup() {

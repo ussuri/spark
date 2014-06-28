@@ -78,6 +78,7 @@ class _SparkOverlayManager {
 
 @CustomTag("spark-overlay")
 class SparkOverlay extends SparkWidget {
+  // TODO(ussuri): Getter/setter were needed to fix BUG #2252.
   bool _opened = false;
 
   /**
@@ -90,10 +91,6 @@ class SparkOverlay extends SparkWidget {
   @published set opened(bool val) {
     if (_opened != val) {
       _opened = val;
-      // TODO(ussuri): Getter/setter were needed to fix the Menu and Modal not
-      // working in the deployed code. With a simple `@published bool opened`,
-      // writes to it via data binding or direct assignment elsewhere here
-      // were not detected (didn't invoke [openedChanged]).
       openedChanged();
     }
   }
@@ -101,7 +98,7 @@ class SparkOverlay extends SparkWidget {
   /**
    * Adds an arrow on a side of the overlay at a specified location.
    */
-  @published String arrow = 'none';
+  @attribute String arrow = 'none';
 
   static final List<String> _SUPPORTED_ARROWS = [
     'none', 'top-center', 'top-left', 'top-right'
@@ -112,18 +109,18 @@ class SparkOverlay extends SparkWidget {
    * events. This essentially disables the rest of the UI while the overlay
    * is open.
    */
-  @published bool modal = false;
+  @attribute bool modal = false;
 
   /**
    * Close the overlay automatically if the user taps outside it or presses
    * the escape key.
    */
-  @published bool autoClose = false;
+  @attribute bool autoClose = false;
 
   /**
    * The kind of animation that the overlay should perform on open/close.
    */
-  @PublishedProperty(reflect: true) String animation = 'none';
+  @attribute String animation = 'none';
 
   static final List<String> _SUPPORTED_ANIMATIONS = [
     'none', 'fade', 'shake', 'scale-slideup'

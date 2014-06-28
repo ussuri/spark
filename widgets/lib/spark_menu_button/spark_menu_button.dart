@@ -17,11 +17,11 @@ import '../spark_overlay/spark_overlay.dart';
 
 @CustomTag("spark-menu-button")
 class SparkMenuButton extends SparkWidget {
-  @published dynamic selected;
-  @published String valueAttr = '';
-  @published bool opened = false;
-  @published bool responsive = false;
-  @published String arrow = 'none';
+  @attribute dynamic selected;
+  @attribute String valueAttr = '';
+  @attribute bool opened = false;
+  @attribute bool responsive = false;
+  @attribute String arrow = 'none';
   static final List<String> _SUPPORTED_ARROWS = [
     'none', 'top-center', 'top-left', 'top-right'
   ];

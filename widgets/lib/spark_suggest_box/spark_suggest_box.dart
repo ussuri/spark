@@ -50,11 +50,11 @@ abstract class SuggestOracle {
 @CustomTag("spark-suggest-box")
 class SparkSuggestBox extends SparkWidget {
   /// Text shown when the text box is empty.
-  @published String placeholder;
+  @attribute String placeholder;
   /// Provies suggestions for `this` suggest box.
-  @published SuggestOracle oracle;
+  @attribute SuggestOracle oracle;
   /// Open state of the overlay.
-  @published bool opened = false;
+  @attribute bool opened = false;
 
   /// Currently displayed suggestions.
   @observable final suggestions = new ObservableList<Suggestion>();

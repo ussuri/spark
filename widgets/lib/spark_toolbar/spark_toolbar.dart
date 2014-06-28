@@ -13,12 +13,12 @@ import '../common/spark_widget.dart';
 @CustomTag("spark-toolbar")
 class SparkToolbar extends SparkWidget {
   /// The client must specify one, and only one, of [vertical] and [horizontal].
-  @published bool horizontal = false;
-  @published bool vertical = false;
+  @attribute bool horizontal = false;
+  @attribute bool vertical = false;
   // TODO(ussuri): Default values don't work on the CSS: force client to specify.
-  @published String justify;
-  @published String spacing;
-  @published bool collapseEmpty = false;
+  @attribute String justify;
+  @attribute String spacing;
+  @attribute bool collapseEmpty = false;
 
   SparkToolbar.created(): super.created();
 

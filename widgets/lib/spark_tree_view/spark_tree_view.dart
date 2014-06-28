@@ -6,12 +6,13 @@ library spark_widgets.tree_view;
 
 import 'package:polymer/polymer.dart';
 
+import '../common/spark_widget.dart';
 import 'spark_tree_view_model.dart';
 import 'src/spark_tree_view_node.dart';
 
 @CustomTag('spark-tree-view')
 class SparkTreeView extends SparkTreeViewNode {
-  @published SparkTreeViewModel model;
+  @attribute SparkTreeViewModel model;
 
   /// Constructor.
   SparkTreeView.created() : super.created();

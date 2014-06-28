@@ -18,12 +18,12 @@ import '../common/spark_widget.dart';
 
 @CustomTag('spark-dialog-button')
 class SparkDialogButton extends SparkWidget {
-  @published bool submit = false;
-  @published bool cancel = false;
-  @published bool dismiss = false;
-  @published bool secondary = false;
-  @published bool raised = false;
-  @published bool disabled = false;
+  @attribute bool submit = false;
+  @attribute bool cancel = false;
+  @attribute bool dismiss = false;
+  @attribute bool secondary = false;
+  @attribute bool raised = false;
+  @attribute bool disabled = false;
 
   SparkDialogButton.created() : super.created();
 

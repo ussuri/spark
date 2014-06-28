@@ -11,11 +11,11 @@ import '../spark_tree_view_model.dart';
 
 @CustomTag('spark-tree-view-node')
 class SparkTreeViewNode extends SparkWidget {
-  @published SparkTreeViewModel treeModel;
-  @published String name;
-  @published String path;
-  @published int level;
-  @published bool expanded;
+  @attribute SparkTreeViewModel treeModel;
+  @attribute String name;
+  @attribute String path;
+  @attribute int level;
+  @attribute bool expanded;
 
   @observable String selfHtml;
   @observable List<SparkTreeViewNode> childrenNames;

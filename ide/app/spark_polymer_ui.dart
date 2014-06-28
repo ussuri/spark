@@ -21,7 +21,7 @@ class SparkPolymerUI extends SparkWidget {
 
   // Just some value to start with in case the client doesn't provide it on
   // startup.
-  @published int splitViewPosition = 100;
+  @attribute int splitViewPosition = 100;
 
   // NOTE: The initial values for these have to be such that dependent
   // <template if> blocks in the .html are turned on, because the app
