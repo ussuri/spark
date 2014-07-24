@@ -48,7 +48,8 @@ class BowerManager extends PackageManager {
       _installOrUpgradePackages(container.project, FetchMode.UPGRADE, monitor);
 
   // TODO(keertip): implement for bower
-  Future<dynamic> arePackagesInstalled(Folder container) => new Future.value(true);
+  Future<dynamic> arePackagesInstalled(Folder container) => 
+      new Future.value(true);
 
   //
   // - end PackageManager abstract interface.
@@ -128,10 +129,9 @@ class _BowerBuilder extends PackageBuilder {
 
     for (ChangeDelta delta in filterPackageChanges(event.changes)) {
       Resource r = delta.resource;
-
-      if (r.isDerived()) continue;
-
-      if (r.name == properties.packageSpecFileName && r.parent is Project) {
+      if (!r.isDerived() && 
+          r.name == properties.packageSpecFileName && 
+          r.parent is Project) {
         futures.add(_handlePackageSpecChange(delta));
       }
     }

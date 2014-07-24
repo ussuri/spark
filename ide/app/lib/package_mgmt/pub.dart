@@ -26,6 +26,10 @@ Logger _logger = new Logger('spark.pub');
 final PubProperties pubProperties = new PubProperties();
 
 class PubProperties extends PackageServiceProperties {
+  // This will get both the "package:foo/bar.dart" variant when used directly
+  // in Dart and the "baz/packages/foo/bar.dart" variant when served over HTTP.
+  final PACKAGE_REF_PREFIX_RE = 
+      new RegExp(r'^(package:|.*/packages/|packages/)(.*)$');
   //
   // PackageServiceProperties virtual interface:
   //
@@ -35,16 +39,13 @@ class PubProperties extends PackageServiceProperties {
   String get packagesDirName => 'packages';
   String get libDirName => 'lib';
   String get packageRefPrefix => 'package:';
-  // This will get both the "package:foo/bar.dart" variant when used directly
-  // in Dart and the "baz/packages/foo/bar.dart" variant when served over HTTP.
-  RegExp get packageRefPrefixRegexp =>
-    new RegExp(r'^(package:|.*/packages/|packages/)(.*)$');
+  RegExp get packageRefPrefixRegexp => PACKAGE_REF_PREFIX_RE;
 
   void setSelfReference(Project project, String selfReference) =>
-    project.setMetadata('${packageServiceName}SelfReference', selfReference);
+      project.setMetadata('${packageServiceName}SelfReference', selfReference);
 
   String getSelfReference(Project project) =>
-    project.getMetadata('${packageServiceName}SelfReference');
+      project.getMetadata('${packageServiceName}SelfReference');
 }
 
 File findPubspec(Container container) {
