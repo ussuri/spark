@@ -703,6 +703,12 @@ class AceManager {
     _aceEditor.fontSize = size;
   }
 
+  String getFontFamily() => _editorElement.style.fontFamily;
+
+  void setFontFamily(String family) {
+    _editorElement.style.fontFamily = family;
+  }
+
   void focus() => _aceEditor.focus();
 
   void resize() => _aceEditor.resize(false);
@@ -938,40 +944,78 @@ class KeyBindingManager {
 }
 
 class AceFontManager {
+  static const List<String> _FAMILIES = const [
+    "'Droid Mono Sans'",
+    "'Consolas'",
+    "'Monaco'",
+    "'Liberation Mono'",
+    "'Ubuntu Mono'"
+  ];
+
   AceManager aceManager;
   PreferenceStore prefs;
   html.Element _label;
-  num _value;
+  String _family;
+  num _size;
 
   AceFontManager(this.aceManager, this.prefs, this._label) {
-    _value = aceManager.getFontSize();
-    _updateLabel(_value);
+    _size = aceManager.getFontSize();
+    _family = aceManager.getFontFamily();
+    if (!_FAMILIES.contains(_family)) {
+      _family = _FAMILIES[0];
+      aceManager.setFontFamily(_family);
+    }
+    _updateLabel();
 
     prefs.getValue('fontSize').then((String pref) {
       try {
-        _value = num.parse(pref);
-        aceManager.setFontSize(_value);
-        _updateLabel(_value);
+        _size = num.parse(pref);
+        aceManager.setFontSize(_size);
+        _updateLabel();
       } catch (e) {
-
       }
+    });
+
+    prefs.getValue('fontFamily').then((String pref) {
+      _family = pref;
+      aceManager.setFontFamily(pref);
+      _updateLabel();
     });
   }
 
-  void dec() => _adjustSize(_value - 2);
+  void dec() => _adjustSize(_size - 2);
 
-  void inc() => _adjustSize(_value + 2);
+  void inc() => _adjustSize(_size + 2);
+
+  void prev() => _changeFamily(-1);
+
+  void next() => _changeFamily(1);
 
   void _adjustSize(num newValue) {
     // Clamp to between 6pt and 36pt.
-    _value = newValue.clamp(6, 36);
-    aceManager.setFontSize(_value);
-    _updateLabel(_value);
-    prefs.setValue('fontSize', _value.toString());
+    _size = newValue.clamp(6, 36);
+    aceManager.setFontSize(_size);
+    _updateLabel();
+    prefs.setValue('fontSize', _size.toString());
   }
 
-  void _updateLabel(num size) {
-    _label.text = '${size}pt';
+  void _changeFamily(int step) {
+    var index = _FAMILIES.indexOf(_family);
+    if (index == null) {
+      index = 0;
+    } else {
+      index += step;
+      if (index == _FAMILIES.length) index = 0;
+      if (index == -1) index = _FAMILIES.length - 1;
+    }
+    _family = _FAMILIES[index];
+    aceManager.setFontFamily(_family);
+    _updateLabel();
+    prefs.setValue('fontFamilyIndex', _family.toString());
+  }
+
+  void _updateLabel() {
+    _label.text = '${_family} ${_size}px';
   }
 }
 

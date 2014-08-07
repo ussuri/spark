@@ -116,6 +116,16 @@ class SparkPolymerUI extends SparkWidget {
     _model.aceFontManager.inc();
   }
 
+  void onFontPrev(Event e) {
+    e.stopPropagation();
+    _model.aceFontManager.prev();
+  }
+
+  void onFontNext(Event e) {
+    e.stopPropagation();
+    _model.aceFontManager.next();
+  }
+
   void onSplitterUpdate(CustomEvent e, var detail) {
     _model.onSplitViewUpdate(detail['targetSize']);
   }

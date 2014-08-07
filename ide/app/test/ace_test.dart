@@ -55,6 +55,8 @@ class MockAceManager implements AceManager {
   void setKeyBinding(String name) { }
   num getFontSize() => null;
   void setFontSize(num size) { }
+  String getFontFamily() => 'Monaco';
+  void setFontFamily(String family) { }
   void setMarkers(List<workspace.Marker> markers) { }
   void clearMarkers() { }
   void selectNextMarker() { }

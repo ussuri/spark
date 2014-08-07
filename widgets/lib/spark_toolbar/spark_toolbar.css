@@ -21,11 +21,13 @@
   flex-flow: column;
 }
 
-:host([justify=left]) {
+:host([justify=left]),
+:host([justify=top]) {
   justify-content: flex-start;
 }
 
-:host([justify=right]) {
+:host([justify=right]),
+:host([justify=bottom]) {
   justify-content: flex-end;
 }
 

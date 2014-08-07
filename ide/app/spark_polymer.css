@@ -9,6 +9,13 @@
 /* Order is important */
 @import url("spark_common.css");
 
+/* Additional SVG fonts for the editor */
+@import url("third_party/fonts/consolas/consolas-fontface.css");
+@import url("third_party/fonts/droid-sans-mono/droid-sans-mono-fontface.css");
+@import url("third_party/fonts/liberation-mono/liberation-mono-fontface.css");
+@import url("third_party/fonts/monaco/monaco-fontface.css");
+@import url("third_party/fonts/ubuntu-mono/ubuntu-mono-fontface.css");
+
 body {
   bottom: 0;
   display: flex;
