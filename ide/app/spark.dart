@@ -1456,7 +1456,6 @@ abstract class SparkActionWithProgressDialog extends SparkActionWithDialog {
   void _toggleProgressVisible(bool visible) {
     if (_progress != null) {
       _progress.visible = visible;
-      _progress.deliverChanges();
     } else {
       _dialog.activityVisible = visible;
     }
@@ -2467,9 +2466,6 @@ class DeployToMobileDialog extends SparkActionWithProgressDialog {
     _setProgressMessage("Deploying…");
     _toggleProgressVisible(true);
     _deployButton.disabled = true;
-    // TODO(ussuri): BUG #2252.
-    _deployButton.deliverChanges();
-
     _monitor = new ProgressMonitorImpl(this);
 
     String type = getElement('input[name="mobileDeployType"]:checked').id;
@@ -2503,7 +2499,6 @@ class DeployToMobileDialog extends SparkActionWithProgressDialog {
     _setProgressMessage('');
     _toggleProgressVisible(false);
     _deployButton.disabled = false;
-    _deployButton.deliverChanges();
   }
 
   void _cancel() {
@@ -2665,7 +2660,6 @@ class GitCloneAction extends SparkActionWithProgressDialog {
     SparkDialogButton cloneButton = getElement('#clone');
     cloneButton.disabled = true;
     cloneButton.text = "Cloning…";
-    cloneButton.deliverChanges();
 
     String url = _repoUrlElement.value;
     String projectName;
@@ -2850,11 +2844,9 @@ class GitBranchAction extends SparkActionWithProgressDialog implements ContextAc
 
     SparkDialogButton closeButton = getElement('#gitBranchCancel');
     closeButton.disabled = true;
-    closeButton.deliverChanges();
 
     SparkDialogButton branchButton = getElement('#gitBranch');
     branchButton.disabled = true;
-    branchButton.deliverChanges();
 
     _GitBranchJob job = new _GitBranchJob(
         gitOperations, _branchNameElement.value, branchName, spark);
@@ -2966,10 +2958,8 @@ class GitCommitAction extends SparkActionWithProgressDialog implements ContextAc
     if (modifiedCnt + addedCnt + deletedCnt == 0) {
       _gitStatusElement.text = "Nothing to commit.";
       commitButton.disabled = true;
-      commitButton.deliverChanges();
     } else {
       commitButton.disabled = false;
-      commitButton.deliverChanges();
       _gitStatusElement.text =
           '$modifiedCnt ${(modifiedCnt != 1) ? 'files' : 'file'} modified, ' +
           '$addedCnt ${(addedCnt != 1) ? 'files' : 'file'} added, ' +
@@ -3002,22 +2992,18 @@ class GitCommitAction extends SparkActionWithProgressDialog implements ContextAc
   void _restoreDialog() {
     SparkDialogButton commitButton = getElement('#gitCommit');
     commitButton.disabled = false;
-    commitButton.deliverChanges();
 
     SparkDialogButton closeButton = getElement('#gitCommitCancel');
     closeButton.disabled = false;
-    closeButton.deliverChanges();
     _toggleProgressVisible(false);
   }
 
   void _commit() {
     SparkDialogButton commitButton = getElement('#gitCommit');
     commitButton.disabled = true;
-    commitButton.deliverChanges();
 
     SparkDialogButton closeButton = getElement('#gitCommitCancel');
     closeButton.disabled = true;
-    closeButton.deliverChanges();
 
     _setProgressMessage("Committing…");
     _toggleProgressVisible(true);
@@ -3095,11 +3081,9 @@ class GitCheckoutAction extends SparkActionWithProgressDialog implements Context
 
     SparkDialogButton closeButton = getElement('#gitCheckoutCancel');
     closeButton.disabled = true;
-    closeButton.deliverChanges();
 
     SparkDialogButton checkoutButton = getElement('#gitCheckout');
     checkoutButton.disabled = true;
-    checkoutButton.deliverChanges();
 
     _GitCheckoutJob job = new _GitCheckoutJob(gitOperations, branchName, spark);
     spark.jobManager.schedule(job).then((_) {
@@ -3214,11 +3198,9 @@ class GitPushAction extends SparkActionWithProgressDialog implements ContextActi
 
     SparkDialogButton closeButton = getElement('#gitPushClose');
     closeButton.disabled = true;
-    closeButton.deliverChanges();
 
     SparkDialogButton pushButton = getElement('#gitPush');
     pushButton.disabled = true;
-    pushButton.deliverChanges();
 
     _GitPushTask task = new _GitPushTask(gitOperations, _gitUsername, _gitPassword,
         spark, null);

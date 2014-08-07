@@ -67,20 +67,6 @@ class SparkPolymerUI extends SparkWidget {
     showWipProjectTemplates = SparkFlags.showWipProjectTemplates;
     chromeOS = PlatformInfo.isCros;
     appVersion = _model.appVersion;
-
-    // This propagates external changes down to the enclosed widgets.
-    Observable.dirtyCheck();
-  }
-
-  void splitViewPositionChanged() {
-    // TODO(ussuri): In deployed code, this was critical for correct
-    // propagation of the client's changes in [splitViewPosition] to _splitView.
-    // Investigate. `targetSizeChanged()` is due to BUG #2252.
-    if (IS_DART2JS) {
-      _splitView
-          ..targetSize = splitViewPosition
-          ..targetSizeChanged();
-    }
   }
 
   void onMenuSelected(CustomEvent event, var detail) {

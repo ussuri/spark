@@ -12,8 +12,6 @@ import 'package:polymer/polymer.dart';
 import '../common/spark_widget.dart';
 import '../spark_button/spark_button.dart';
 import '../spark_menu/spark_menu.dart';
-// TODO(ussuri): Temporary. See the comment below.
-import '../spark_overlay/spark_overlay.dart';
 
 @CustomTag("spark-menu-button")
 class SparkMenuButton extends SparkWidget {
@@ -27,7 +25,6 @@ class SparkMenuButton extends SparkWidget {
   ];
 
   SparkButton _button;
-  SparkOverlay _overlay;
   SparkMenu _menu;
 
   final List<bool> _toggleQueue = [];
@@ -40,11 +37,6 @@ class SparkMenuButton extends SparkWidget {
     super.attached();
 
     assert(_SUPPORTED_ARROWS.contains(arrow));
-
-    _overlay = $['overlay'];
-    // TODO(ussuri): This lets _overlay handle ESC but breaks _button's
-    // active state when menu is open.
-    //SparkWidget.enableKeyboardEvents(_overlay);
 
     _menu = $['menu'];
 
@@ -83,17 +75,14 @@ class SparkMenuButton extends SparkWidget {
     final bool newOpened = _toggleQueue.reduce((a, b) => a && b);
     if (newOpened != opened) {
       opened = newOpened;
-      // TODO(ussuri): A hack to make #overlay and #button see
-      // changes in 'opened'. Data binding via {{opened}} in the HTML wasn't
-      // detected. deliverChanges() here fix #overlay, but not #button.
-      // setAttr() fixes #button, but break #overlay. See BUG #2252.
-      _overlay..opened = newOpened..deliverChanges();
-      _button.setAttr('active', newOpened);
+      _button.active = newOpened;
       if (newOpened) {
         // Enforce focused state so the button can accept keyboard events.
         focus();
         _menu.resetState();
       }
+      // TODO(ussuri): BUG #2252. Without this, _overlay didn't see changes.
+      deliverChanges();
     }
     _toggleQueue.clear();
     _toggleTimer.cancel();
@@ -110,15 +99,15 @@ class SparkMenuButton extends SparkWidget {
    * Handle the on-opened event from the dropdown. It will be fired e.g. when
    * mouse is clicked outside the dropdown (with autoClosedDisabled == false).
    */
-  void overlayOpenedHandler(CustomEvent e) {
+  void overlayOpenedHandler(CustomEvent e, var detail) {
     // Autoclosing is the only event we're interested in.
-    if (e.detail == false) {
+    if (detail == false) {
       _toggle(false);
     }
   }
 
-  void menuActivateHandler(CustomEvent e, var details) {
-    if (details['isSelected']) {
+  void menuActivateHandler(CustomEvent e, var detail) {
+    if (detail['isSelected']) {
       _toggle(false);
     }
   }

@@ -9,6 +9,7 @@
   font-weight: 500;
 }
 
-:host([disabled]) {
+:host([disabled]),
+:host([disabled]) * {
   pointer-events: none !important;
 }

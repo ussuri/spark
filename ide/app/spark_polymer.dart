@@ -225,10 +225,7 @@ class SparkPolymer extends Spark {
     syncPrefs.getValue('splitViewPosition', '300').then((String position) {
       int value = int.parse(position, onError: (_) => null);
       if (value != null) {
-        // TODO(ussuri): BUG #2252.
-        _ui
-            ..splitViewPosition = value
-            ..deliverChanges();
+        _ui.splitViewPosition = value;
       }
     });
   }

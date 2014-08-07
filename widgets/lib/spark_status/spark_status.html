@@ -5,18 +5,15 @@
      license that can be found in the LICENSE file. -->
 
 <link rel="import" href="../../../packages/spark_widgets/common/spark_widget.html"/>
+<link rel="import" href="../../../packages/spark_widgets/spark_icon/spark_icon.html"/>
 
 <polymer-element name="spark-status" extends="spark-widget"
     attributes="spinning defaultMessage temporaryMessage progressMessage">
   <template>
     <link rel="stylesheet" href="spark_status.css">
 
-    <div id="status-container">
-      <div id="label"></div>
-      <div id="throbber">
-        <div id="spinner"></div>
-      </div>
-    </div>
+    <span id="label">{{message}}</span>
+    <spark-icon id="throbber" src="throbber.gif" size="24px"></spark-icon>
   </template>
 
   <script type="application/dart" src="spark_status.dart"></script>

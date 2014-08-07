@@ -49,6 +49,23 @@ class SparkWidget extends PolymerElement {
     if (_focusableChild != null) {
       enableKeyboardEvents(_focusableChild);
     }
+
+    // TODO(ussuri): BUG #2252. This explicitly watches for changes in the
+    // widget's attributes/properties and enforces dirty checking: Polymer
+    // should do that automatically, but is currently broken.
+    final observer = new MutationObserver((records, _) {
+      print("$id: ${records.map((r) => r.attributeName)}");
+      Observable.dirtyCheck();
+    });
+    observer.observe(
+        this,
+        childList: false,
+        attributes: true,
+        characterData: false,
+        subtree: false,
+        attributeOldValue: false,
+        characterDataOldValue: false
+    );
   }
 
   Element getShadowDomElement(String selectors) =>

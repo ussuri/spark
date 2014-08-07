@@ -47,8 +47,7 @@ void main() {
         btnElt
             ..primary = true
             ..padding = 'none'
-            ..active = true
-            ..deliverChanges();
+            ..active = true;
 
         expect(btn.classes.contains('primary'), isTrue);
         expect(btn.classes.contains('active'), isTrue);
@@ -57,8 +56,7 @@ void main() {
         btnElt
             ..primary = false
             ..padding = 'medium'
-            ..active = false
-            ..deliverChanges();
+            ..active = false;
 
         expect(btn.classes.contains('primary'), isFalse);
         expect(btn.classes.contains('active'), isFalse);

@@ -7,14 +7,14 @@
 :host {
   display: inline-block;
   white-space: nowrap;
-  pointer-events: none;
-}
-
-#status-container {
   background-color: rgba(66, 129, 244, 0.9);
   border-radius: 22px;
   padding: 10px 20px;
   pointer-events: none;
+}
+
+:host(.hidden) {
+  display: none;
 }
 
 #throbber {
@@ -27,7 +27,7 @@
   vertical-align: middle;
 }
 
-#throbber.spinning {
+:host([]) {
   display: inline-block;
 }
 
@@ -42,15 +42,4 @@
   vertical-align: middle;
   margin-left: 0;
   padding-left: 0;
-}
-
-#status-container.hidden {
-  opacity: 0;
-}
-
-#spinner {
-  width: 24px;
-  height: 24px;
-  position: relative;
-  background-image:url("throbber.gif");
 }

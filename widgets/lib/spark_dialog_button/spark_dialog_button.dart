@@ -41,20 +41,12 @@ class SparkDialogButton extends SparkWidget {
     // Consume all mouse click events if this component is disabled. If we
     // don't, the overlay handler will process the mouse event and close the
     // dialog, even if the user clicked on a disabled button.
+    // TODO(ussuri): Check if this is still needed: some .css fixes were done.
     super.onClick.listen((e) {
       if (disabled) {
         e..stopPropagation()..preventDefault();
       }
     });
-  }
-
-  // TODO(ussuri): BUG #2252
-  @override
-  bool deliverChanges() {
-    bool result = super.deliverChanges();
-    SparkWidget widget = getShadowDomElement('spark-button');
-    widget.setAttr('disabled', disabled);
-    return result;
   }
 
   void updateParentFormValidity(bool formIsValid) {

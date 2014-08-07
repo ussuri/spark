@@ -76,7 +76,6 @@ class SparkProgress extends SparkWidget {
     // TODO(ussuri): Investigate why this explicit assignment is necessary.
     visible = visible;
     indeterminate = indeterminate;
-    indeterminateChanged();
   }
 
   Stream get onCancelled => on['cancelled'];

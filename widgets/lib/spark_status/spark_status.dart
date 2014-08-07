@@ -5,7 +5,6 @@
 library spark_widgets.status;
 
 import 'dart:async';
-import 'dart:html';
 
 import 'package:polymer/polymer.dart';
 
@@ -33,87 +32,44 @@ class SparkStatus extends SparkWidget {
   @attribute String progressMessage;
   @attribute String temporaryMessage;
 
-  Element _label;
-  Element _throbber;
-  Element _container;
+  @observable String message;
 
   Timer _timer;
 
-  // TODO(ussuri): Get rid of @published getters/setters for everything.
-
-  @published bool get spinning => _spinning;
-
-  @published set spinning(bool value) {
-    _spinning = value;
-    _update();
-  }
-
-  @published String get defaultMessage =>
-      _defaultMessage == null ? '' : _defaultMessage;
-
-  @published set defaultMessage(String value) {
-    _defaultMessage = value;
-    _update();
-  }
-
-  @published String get progressMessage =>
-      _progressMessage == null ? '' : _progressMessage;
-
-  @published set progressMessage(String value) {
-    _progressMessage = value;
-    _update();
-  }
-
-  @published String get temporaryMessage =>
-      _temporaryMessage == null ? '' : _temporaryMessage;
-
-  @published set temporaryMessage(String value) {
-    if (_timer != null) {
-      _timer.cancel();
-    }
-
-    _temporaryMessage = value;
-    _update();
-
-    if (value != null) {
-      _timer = new Timer(new Duration(seconds: 3), () {
-        temporaryMessage = null;
-      });
-    }
-  }
+  SparkStatus.created() : super.created();
 
   @override
   void attached() {
     super.attached();
-
-    _container = getShadowDomElement('#status-container');
-    _label = getShadowDomElement('#label');
-    _throbber = getShadowDomElement('#throbber');
     _update();
   }
 
-  bool get _showingProgressMessage =>
-      _temporaryMessage == null && _progressMessage != null;
+  void defaultMessageChanged() => _update();
 
-  bool get _showingDefaultMessage =>
-      _temporaryMessage == null && _progressMessage == null;
+  void progressMessageChanged() => _update();
 
-  bool get _showingTemporaryMessage => _temporaryMessage != null;
+  void temporaryMessageChanged() {
+    if (_timer != null) {
+      _timer.cancel();
+    }
+    if (temporaryMessage != null) {
+      _timer = new Timer(new Duration(seconds: 3), () {
+        temporaryMessage = null;
+      });
+    }
+    _update();
+  }
 
   void _update() {
-    _throbber.classes.toggle('spinning',
-        _spinning && (_temporaryMessage == null));
-    final String text = _calculateMessage();
-    _container.classes.toggle('hidden', text.isEmpty);
-    _label.text = text;
+    message = _calculateMessage();
+    classes.toggle('hidden', message.isEmpty);
+    classes.toggle('spinning', spinning && (temporaryMessage == null));
   }
 
   String _calculateMessage() {
-    if (_temporaryMessage != null) return _temporaryMessage;
-    if (_progressMessage != null) return _progressMessage;
-    if (_defaultMessage != null) return _defaultMessage;
+    if (temporaryMessage != null) return temporaryMessage;
+    if (progressMessage != null) return progressMessage;
+    if (defaultMessage != null) return defaultMessage;
     return '';
   }
-
-  SparkStatus.created() : super.created();
 }
