@@ -21,6 +21,8 @@ class SparkMenuItem extends SparkWidget {
   /// Description for this menu, usually used for a keybinding description.
   @attribute String description = "";
 
+  @published bool checkmark = false;
+
   SparkMenuItem.created(): super.created();
 
   @override

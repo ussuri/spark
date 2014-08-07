@@ -13,6 +13,7 @@ import 'analytics_test.dart' as analytics_test;
 import 'app_test.dart' as app_test;
 import 'benchmarks.dart' as benchmarks;
 import 'builder_test.dart' as builder_test;
+import 'dependency_test.dart' as dependency_test;
 import 'cssbeautify_test.dart' as cssbeautify_test;
 import 'editors_test.dart' as editors_test;
 import 'event_bus_test.dart' as event_bus_test;
@@ -31,6 +32,7 @@ import 'server_test.dart' as server_test;
 import 'services_test.dart' as services_test;
 import 'services_common_test.dart' as services_common_test;
 import 'tcp_test.dart' as tcp_test;
+import 'ui/all.dart' as ui_all_test;
 import 'utils_test.dart' as utils_test;
 import 'workspace_test.dart' as workspace_test;
 
@@ -43,6 +45,7 @@ void defineTests() {
   analytics_test.defineTests();
   app_test.defineTests();
   builder_test.defineTests();
+  dependency_test.defineTests();
   cssbeautify_test.defineTests();
   editors_test.defineTests();
   event_bus_test.defineTests();
@@ -61,6 +64,7 @@ void defineTests() {
   services_test.defineTests();
   services_common_test.defineTests();
   tcp_test.defineTests();
+  ui_all_test.defineTests();
   utils_test.defineTests();
   workspace_test.defineTests();
 

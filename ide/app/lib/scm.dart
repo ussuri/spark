@@ -16,6 +16,7 @@ import 'package:logging/logging.dart';
 import 'package:observe/observe.dart';
 
 import 'builder.dart';
+import 'decorators.dart';
 import 'exception.dart';
 import 'jobs.dart';
 import 'workspace.dart';
@@ -184,9 +185,9 @@ abstract class ScmProjectOperations {
 
   Future<List<String>> getLocalBranchNames();
 
-  Future<Iterable<String>> getRemoteBranchNames();
+  Future<List<String>> getRemoteBranchNames();
 
-  Future<Iterable<String>> getUpdatedRemoteBranchNames();
+  Future<List<String>> getUpdatedRemoteBranchNames();
 
   Future createBranch(String branchName, String sourceBranchName);
 
@@ -269,7 +270,7 @@ class GitScmProvider extends ScmProvider {
 
   String get id => 'git';
 
-  Clone activeClone;
+  Clone _activeClone;
 
   bool isUnderScm(Project project) {
     Folder gitFolder = project.getChild('.git');
@@ -296,21 +297,21 @@ class GitScmProvider extends ScmProvider {
         branchName: branchName, username: username, password: password);
 
     return options.store.init().then((_) {
-      activeClone = new Clone(options);
-      return activeClone.clone().then((_) {
+      _activeClone = new Clone(options);
+      return _activeClone.clone().then((_) {
         return options.store.index.flush().then((_) {
-          activeClone = null;
+          _activeClone = null;
         });
       });
     }).catchError((e) {
-      activeClone = null;
+      _activeClone = null;
       throw SparkException.fromException(e);
     });
   }
 
   void cancelClone() {
-    if (activeClone != null) {
-      activeClone.cancel();
+    if (_activeClone != null) {
+      _activeClone.cancel();
     }
   }
 }
@@ -378,12 +379,12 @@ class GitScmProjectOperations extends ScmProjectOperations {
 
   Stream<ScmProjectOperations> get onStatusChange => _statusController.stream;
 
-  Future<Iterable<String>> getLocalBranchNames() =>
+  Future<List<String>> getLocalBranchNames() =>
       objectStore.then((store) => store.getLocalBranches());
 
-  Future<Iterable<String>> getRemoteBranchNames()  {
+  Future<List<String>> getRemoteBranchNames()  {
     return objectStore.then((store) {
-      return store.getRemoteHeads().then((result) {
+      return store.getRemoteHeads().then((List<String> result) {
         GitOptions options = new GitOptions(root: entry, store: store);
         // Return immediately but requet async update.
         // TODO(grv): wait for it when, the UI support refreshing remote branches.
@@ -393,7 +394,7 @@ class GitScmProjectOperations extends ScmProjectOperations {
     });
   }
 
-  Future<Iterable<String>> getUpdatedRemoteBranchNames()  {
+  Future<List<String>> getUpdatedRemoteBranchNames()  {
     return objectStore.then((store) {
       GitOptions options = new GitOptions(root: entry, store: store);
       return Fetch.updateAndGetRemoteRefs(options);
@@ -600,6 +601,32 @@ class GitScmProjectOperations extends ScmProjectOperations {
     resource.setMetadata('scmStatus', new ScmFileStatus.fromIndexStatus(
         fileStatus).status);
   }
+}
+
+/**
+ * A decorator to add text decorations for the current branch of a project.
+ */
+class ScmDecorator extends Decorator {
+  final ScmManager _manager;
+  final StreamController _controller = new StreamController.broadcast();
+
+  ScmDecorator(this._manager) {
+    _manager.onStatusChange.listen((_) => _controller.add(null));
+  }
+
+  bool canDecorate(Object object) {
+    if (object is! Project) return false;
+    return _manager.getScmOperationsFor(object) != null;
+  }
+
+  String getTextDecoration(Object object) {
+    ScmProjectOperations scmOperations = _manager.getScmOperationsFor(object);
+    String branchName = scmOperations.getBranchName();
+    if (branchName == null) branchName = '';
+    return '[${branchName}]';
+  }
+
+  Stream get onChanged => _controller.stream;
 }
 
 /**

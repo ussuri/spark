@@ -108,6 +108,10 @@ spark-dialog {
   z-index: 101;
 }
 
+#sparkStatus.hovered {
+  opacity: 0.1;
+}
+
 #settingsDialog .settings-label {
   width: 150px;
 }
@@ -121,6 +125,7 @@ spark-dialog {
   color: #666;
   text-align: center;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 #settingsDialog .settings-block {
@@ -129,12 +134,12 @@ spark-dialog {
   background-color: white;
 }
 
-#settingsDialog .plus-minus-button {
+#settingsDialog .change-setting-button {
   width: 30px;
   height: 30px;
 }
 
-#settingsDialog .settings-value + .plus-minus-button {
+#settingsDialog .settings-value + .change-setting-button {
   margin-left: 5px;
 }
 
@@ -162,6 +167,11 @@ spark-dialog {
 
 #aboutDialog #analyticsCheck {
   margin: 0 20px;
+}
+
+#errorMessage {
+  max-height: 200px;
+  overflow-y: auto;
 }
 
 #gitResetSettingsDone,
@@ -265,4 +275,23 @@ label[for="stripWhitespace"] {
   display: inline-block;
   margin-left: 10px;
   vertical-align: middle;
+}
+
+#moreSearch {
+  fill: #7d7d7d;
+  height: 24px;
+  left: 8px;
+  position: absolute;
+  top: 5px;
+  width: 24px;
+}
+
+#moreSearchArrow {
+  left: 10px;
+  position: absolute;
+  top: 21px;
+}
+
+#moreSearch:hover {
+  fill: #444;
 }

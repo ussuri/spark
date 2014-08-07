@@ -10,6 +10,7 @@ library spark.workspace;
 import 'dart:async';
 import 'dart:collection';
 import 'dart:convert' show JSON;
+import 'dart:html' as html;
 import 'dart:math' as math;
 
 import 'package:chrome/chrome_app.dart' as chrome;
@@ -17,8 +18,8 @@ import 'package:logging/logging.dart';
 
 import 'builder.dart';
 import 'enum.dart';
+import 'exception.dart';
 import 'jobs.dart';
-import 'package_mgmt/pub_properties.dart';
 import 'preferences.dart';
 import 'utils.dart';
 
@@ -27,31 +28,37 @@ final Logger _logger = new Logger('spark.workspace');
 final _ChromeHelper _chromeHelper = new _ChromeHelper();
 
 /**
+ * Check for error reported when dealing with symlinks
+ */
+bool isSymlinkError(dynamic e) =>
+    e is html.FileError && e.name == 'InvalidModificationError';
+
+/**
  * The Workspace is a top-level entity that can contain files and projects. The
  * files that it contains are loose files; they do not have parent projects.
  */
 class Workspace extends Container {
   int _resourcePauseCount = 0;
-  List<ChangeDelta> _resourceChangeList = [];
+  final List<ChangeDelta> _resourceChangeList = [];
 
   int _markersPauseCount = 0;
-  List<MarkerDelta> _makerChangeList = [];
+  final List<MarkerDelta> _makerChangeList = [];
 
   JobManager _jobManager;
   BuilderManager _builderManager;
 
-  List<WorkspaceRoot> _roots = [];
+  final List<WorkspaceRoot> _roots = [];
 
   chrome.FileSystem _syncFileSystem;
 
-  PreferenceStore _store;
-  Completer<Workspace> _whenAvailable = new Completer();
-  Completer<Workspace> _whenAvailableSyncFs = new Completer();
+  final PreferenceStore _store;
+  final Completer<Workspace> _whenAvailable = new Completer();
+  final Completer<Workspace> _whenAvailableSyncFs = new Completer();
 
-  StreamController<ResourceChangeEvent> _resourceController =
+  final StreamController<ResourceChangeEvent> _resourceController =
       new StreamController.broadcast();
 
-  StreamController<MarkerChangeEvent> _markerController =
+  final StreamController<MarkerChangeEvent> _markerController =
       new StreamController.broadcast();
 
   Workspace([this._store, this._jobManager]) : super(null, null) {
@@ -162,6 +169,13 @@ class Workspace extends Container {
       resources.forEach((r) => list.addAll(ChangeDelta.containerDelete(r)));
       changes.forEach((List<ChangeDelta> deltas) => list.addAll(deltas));
       _fireResourceChanges(list);
+    }).catchError((e) {
+      if (isSymlinkError(e)) {
+        return new Future.error(new SparkException(
+             SparkErrorMessages.SYMLINKS_ERROR_MSG,
+             errorCode: SparkErrorConstants.SYMLINKS_OPERATION_NOT_SUPPORTED));
+      }
+      return new Future.error(e);
     });
   }
 
@@ -432,7 +446,7 @@ class Workspace extends Container {
     }, onError: (e) {
         _logger.warning('Exception in workspace restore sync file system', e);
     }).timeout(new Duration(seconds: 20)).whenComplete(() {
-      progressJob.done();
+      progressJob.done(new SparkJobStatus(code: SparkStatusCodes.SPARK_JOB_STATUS_OK));
       _whenAvailableSyncFs.complete(this);
     });
   }
@@ -845,6 +859,12 @@ class Folder extends Container {
    * filesystem to the current folder.
    */
   Future<File> importFileEntry(chrome.ChromeFileEntry sourceEntry) {
+    return _importFileEntry(sourceEntry).then((_) {
+      refresh();
+    });
+  }
+
+  Future<File> _importFileEntry(chrome.ChromeFileEntry sourceEntry) {
     return createNewFile(sourceEntry.name).then((File file) {
       return sourceEntry.readBytes().then((chrome.ArrayBuffer buffer) {
         return file.setBytes(buffer.getBytes()).then((_) => file);
@@ -874,8 +894,12 @@ class Folder extends Container {
    */
   Future importDirectoryEntry(chrome.DirectoryEntry entry) {
     Map<String, chrome.Entry> importFileMap = {};
-    return _listFilesRecursive(entry, importFileMap).then((_)
-        => _importDirectoryEntry(entry, importFileMap));
+
+    return _listFilesRecursive(entry, importFileMap).then((_) {
+      return _importDirectoryEntry(entry, importFileMap);
+    }).then((_) {
+      refresh();
+    });
   }
 
   Future _importDirectoryEntry(chrome.DirectoryEntry entry,
@@ -894,7 +918,7 @@ class Folder extends Container {
           if (child is chrome.DirectoryEntry) {
             futures.add(folder._importDirectoryEntry(child, importFileMap));
           } else if (child is chrome.ChromeFileEntry) {
-            futures.add(folder.importFileEntry(child));
+            futures.add(folder._importFileEntry(child));
           }
         }
         return Future.wait(futures).then((_) {
@@ -918,13 +942,21 @@ class Folder extends Container {
   }
 
   Future delete() {
-    return _dirEntry.removeRecursively().then((_)
-        => _parent._removeChild(this, fireEvent: true));
+    return _dirEntry.removeRecursively()
+      .then((_) => _parent._removeChild(this, fireEvent: true))
+      .catchError((e) {
+        if (isSymlinkError(e)) {
+          return new Future.error(new SparkException(
+              SparkErrorMessages.SYMLINKS_ERROR_MSG,
+              errorCode: SparkErrorConstants.SYMLINKS_OPERATION_NOT_SUPPORTED));
+        }
+        return new Future.error(e);
+      });
   }
 
   //TODO(keertip): remove check for 'cache'
   bool isScmPrivate() => name == '.git' || name == '.svn'
-      || (name =='cache' && pubProperties.isFolderWithPackages(parent));
+      || name =='cache';
 
   bool isDerived() {
     // TODO(devoncarew): 'cache' is a temporay folder - it will be removed.

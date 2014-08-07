@@ -13,9 +13,9 @@ import 'package:path/path.dart' as path;
 
 import 'webstore_client.dart';
 
-final NumberFormat _NF = new NumberFormat.decimalPattern();
+const String MAIN_REPOSITORY_URL = 'git://github.com/dart-lang/spark.git';
 
-// TODO: Make the deploy-test and deploy tasks incremental.
+final NumberFormat _NF = new NumberFormat.decimalPattern();
 
 final Directory BUILD_DIR = new Directory('build');
 final Directory DIST_DIR = new Directory('dist');
@@ -27,7 +27,7 @@ final String clientSecret =
     Platform.environment['SPARK_UPLOADER_CLIENTSECRET'];
 final String refreshToken =
     Platform.environment['SPARK_UPLOADER_REFRESHTOKEN'];
-final String appID = Platform.environment['SPARK_APP_ID'];
+final String buildBranchName = Platform.environment['DRONE_BRANCH'];
 
 void main([List<String> args]) {
   defineTask('setup', taskFunction: setup);
@@ -39,7 +39,6 @@ void main([List<String> args]) {
   defineTask('lint', taskFunction: lint, depends: ['setup']);
 
   defineTask('deploy', taskFunction: deploy, depends: ['lint']);
-  //defineTask('dartium', taskFunction: deployForDartium, depends: ['lint']);
 
   defineTask('docs', taskFunction: docs, depends : ['setup']);
   defineTask('stats', taskFunction: stats);
@@ -50,8 +49,6 @@ void main([List<String> args]) {
   // For now, we won't be building the webstore version from Windows.
   if (!Platform.isWindows) {
     defineTask('build-android-rsa', taskFunction: buildAndroidRSA);
-    defineTask('release', taskFunction: release,
-        depends : ['mode-notest', 'deploy']);
     defineTask('release-nightly', taskFunction : releaseNightly,
         depends : ['mode-notest', 'deploy']);
   }
@@ -107,23 +104,6 @@ void lint(context) {
 }
 
 /**
- * Similar to [deploy] but creates a layout suitable for Dartium.
- * Does not run dart2js.
- */
-@deprecated
-// TODO(devoncarew): I believe we do not need this anymore. This was to work
-// around an issue with Dartium not being able to run multiple scripts. Polymer
-// relies on generating Javascript at runtime to work around this; that fails
-// for Chrome Apps because of CSP mode. We now work around this via the
-// `app/spark_bootstrap.dart` script.
-void deployForDartium(GrinderContext context) {
-  Directory sourceDir = joinDir(BUILD_DIR, ['dartium']);
-  Directory destDir = joinDir(BUILD_DIR, ['dartium-out']);
-
-  _polymerDeploy(context, sourceDir, destDir, extraArgs: ['--no-js']);
-}
-
-/**
  * Copy all source to `build/deploy`. Do a polymer deploy to `build/deploy-out`.
  * This builds the regular (non-test) version of the app.
  */
@@ -135,11 +115,6 @@ void deploy(GrinderContext context) {
 
   Directory deployWeb = joinDir(destDir, ['web']);
 
-  // TODO(devoncarew): Remove this once smoke no longer generates code
-  // referencing Dartium's dart:nativewrappers library.
-  _removeNativeWrappersReference(
-      context, deployWeb, 'spark_polymer.html_bootstrap.dart');
-
   // Compile the main Spark app.
   _dart2jsCompile(context, deployWeb,
       'spark_polymer.html_bootstrap.dart', true);
@@ -147,66 +122,12 @@ void deploy(GrinderContext context) {
   // Compile the services entry-point.
   _dart2jsCompile(context, deployWeb, 'services_entry.dart', true);
 
-  // Replace shadow DOM to include some fixes.
-  copyFile(getFile('tool/shadow_dom.debug.js'), joinDir(deployWeb, ['packages', 'shadow_dom']));
-
   // Remove map files.
   List files = BUILD_DIR.listSync(recursive: true, followLinks: false);
   for (FileSystemEntity entity in files) {
     if (entity is File && entity.path.endsWith('.js.map')) {
       deleteEntity(entity);
     }
-  }
-}
-
-// Creates a release build to be uploaded to Chrome Web Store.
-// It will perform the following steps:
-// - Sources will be compiled in Javascript using "compile" task
-// - If the current branch/repo is not releasable, we just create an archive
-//   tagged with a revision number.
-// - Using increaseBuildNumber, for a given revision number a.b.c where a, b
-//   and c are integers, we increase c, the build number and write it to the
-//   manifest.json file.
-// - We duplicate the manifest.json file to build/polymer-build/web since we'll
-//   create the Chrome App from here.
-// - "archive" task will create a spark.zip file in dist/, based on the content
-//   of build/polymer-build/web.
-// - If everything is successful and no exception interrupted the process,
-//   we'll commit the new manifest.json containing the updated version number
-//   to the repository. The developer still needs to push it to the remote
-//   repository.
-// - We eventually rename dist/spark.zip to dist/spark-a.b.c.zip to reflect the
-//   new version number.
-void release(GrinderContext context) {
-  // If repository is not original repository of Spark and the branch is not
-  // master.
-  if (!_canReleaseFromHere()) {
-    _archiveWithRevision(context);
-    return;
-  }
-
-  String version = _increaseBuildNumber(context, removeKey: true);
-  // Creating an archive of the Chrome App.
-  context.log('Creating build ${version}');
-
-  String filename = 'spark-${version}.zip';
-  archive(context, filename);
-
-  var sep = Platform.pathSeparator;
-  _runCommandSync(
-    context,
-    'git checkout app${sep}manifest.json');
-  _increaseBuildNumber(context);
-  _runCommandSync(
-    context,
-    'git commit -m "Build version ${version}" app${sep}manifest.json');
-
-  context.log('Created ${filename}');
-  context.log('** A commit has been created, you need to push it. ***');
-  print('Do you want to push to the remote git repository now? (y/n [n])');
-  var line = stdin.readLineSync();
-  if (line.trim() == 'y') {
-    _runCommandSync(context, 'git push origin master');
   }
 }
 
@@ -220,12 +141,38 @@ Future releaseNightly(GrinderContext context) {
   if (refreshToken == null) {
     context.fail("SPARK_UPLOADER_REFRESHTOKEN environment variable should be set and contain the refresh token.");
   }
-  if (appID == null) {
-    context.fail("SPARK_APP_ID environment variable should be set and contain the refresh token.");
+
+  File file = new File('tool/release-config.json');
+  String content = file.readAsStringSync();
+  var config = JSON.decode(content);
+  String channel = null;
+  Map<String, String> channelConfig = null;
+  config.forEach((String key, Map<String, String> currentChannelConfig) {
+    if (buildBranchName == currentChannelConfig['branch']) {
+      channel = key;
+      channelConfig = currentChannelConfig;
+    }
+  });
+
+  if (_getRepositoryUrl() != MAIN_REPOSITORY_URL) {
+    // Unexpected situation. Don't try to upload a fork to the web store.
+    context.fail("Spark can't be released from here.");
   }
 
+  if (channel == null) {
+    // This branch is not part of any channel.
+    context.fail("Spark can't be released from here.");
+    return new Future.error("Spark can't be released from here.");
+  }
+
+  String appID = channelConfig['id'];
+
+  // Tweak the version number in the manifest.json file using drone.io build number.
   String version =
-      _modifyManifestWithDroneIOBuildNumber(context, removeKey: true);
+      _modifyManifestWithDroneIOBuildNumber(context, channelConfig);
+  _modifyLocaleWithChannelConfig(context, channelConfig);
+  context.log('Building branch ${buildBranchName}, channel ${channel}, version ${version}');
+  context.log('Uploading app ID ${appID} to the Chrome Web Store');
 
   // Creating an archive of the Chrome App.
   context.log('Creating build ${version}');
@@ -233,6 +180,7 @@ Future releaseNightly(GrinderContext context) {
   archive(context, filename);
   context.log('Created ${filename}');
 
+  // Upload it to webstore.
   WebStoreClient client =
       new WebStoreClient(appID, clientID, clientSecret, refreshToken);
   context.log('Authenticating...');
@@ -412,6 +360,13 @@ void _polymerDeploy(GrinderContext context, Directory sourceDir, Directory destD
       arguments: args,
       packageRoot: 'packages',
       workingDirectory: sourceDir.path);
+
+  // Create an empty `user.json` overrides file so we don't get an error in the
+  // console in the deployed application.
+  File userJsonFile = joinFile(destDir, ['web', 'user.json']);
+  if (!userJsonFile.existsSync()) {
+    userJsonFile.writeAsStringSync('{}\n');
+  }
 }
 
 void _dart2jsCompile(GrinderContext context, Directory target, String filePath,
@@ -455,22 +410,17 @@ void _dart2jsCompile(GrinderContext context, Directory target, String filePath,
 
 void _changeMode({bool useTestMode: true}) {
   File file = joinFile(Directory.current, ['app', 'app.json']);
-  file.writeAsStringSync('{"test-mode":${useTestMode}}');
+  file.writeAsStringSync('{"test-mode":${useTestMode}}\n');
 
   file = joinFile(BUILD_DIR, ['deploy', 'web', 'app.json']);
   if (file.parent.existsSync()) {
-    file.writeAsStringSync('{"test-mode":${useTestMode}}');
+    file.writeAsStringSync('{"test-mode":${useTestMode}}\n');
   }
 
   file = joinFile(BUILD_DIR, ['deploy-out', 'web', 'app.json']);
   if (file.parent.existsSync()) {
-    file.writeAsStringSync('{"test-mode":${useTestMode}}');
+    file.writeAsStringSync('{"test-mode":${useTestMode}}\n');
   }
-}
-
-// Returns the name of the current branch.
-String _getBranchName() {
-  return _getCommandOutput('git rev-parse --abbrev-ref HEAD');
 }
 
 // Returns the URL of the git repository.
@@ -483,14 +433,6 @@ String _getCurrentRevision() {
   return _getCommandOutput('git rev-parse HEAD').substring(0, 10);
 }
 
-// We can build a real release only if the repository is the original
-// repository of spark and master is the working branch since we need to
-// increase the version and commit it to the repository.
-bool _canReleaseFromHere() {
-  return (_getRepositoryUrl() == 'https://github.com/dart-lang/spark.git') &&
-         (_getBranchName() == 'master');
-}
-
 // In case, release is performed on a non-releasable branch/repository, we just
 // archive and name the archive with the revision identifier.
 void _archiveWithRevision(GrinderContext context) {
@@ -501,40 +443,8 @@ void _archiveWithRevision(GrinderContext context) {
   context.log("Created ${filename}");
 }
 
-// Increase the build number in the manifest.json file. Returns the full
-// version.
-String _increaseBuildNumber(GrinderContext context, {bool removeKey: false}) {
-  // Tweaking build version in manifest.
-  File file = new File('app/manifest.json');
-  String content = file.readAsStringSync();
-  var manifestDict = JSON.decode(content);
-  String version = manifestDict['version'];
-  RegExp exp = new RegExp(r"(\d+\.\d+)\.(\d+)");
-  Iterable<Match> matches = exp.allMatches(version);
-  assert(matches.length > 0);
-
-  Match m = matches.first;
-  String majorVersion = m.group(1);
-  int buildVersion = int.parse(m.group(2));
-  buildVersion++;
-
-  version = '${majorVersion}.${buildVersion}';
-  manifestDict['version'] = version;
-  if (removeKey) {
-    manifestDict.remove('key');
-  }
-  file.writeAsStringSync(new JsonPrinter().print(manifestDict));
-
-  // It needs to be copied to compile result directory.
-  copyFile(
-      joinFile(Directory.current, ['app', 'manifest.json']),
-      joinDir(BUILD_DIR, ['deploy-out', 'web']));
-
-  return version;
-}
-
 String _modifyManifestWithDroneIOBuildNumber(GrinderContext context,
-                                             {bool removeKey: false})
+                                             Map<String, String> channelConfig)
 {
   String buildNumber = Platform.environment['DRONE_BUILD_NUMBER'];
   String revision = Platform.environment['DRONE_COMMIT'];
@@ -547,23 +457,17 @@ String _modifyManifestWithDroneIOBuildNumber(GrinderContext context,
   File file = new File('app/manifest.json');
   String content = file.readAsStringSync();
   var manifestDict = JSON.decode(content);
-  String version = manifestDict['version'];
-  RegExp exp = new RegExp(r"(\d+\.\d+)\.(\d+)");
-  Iterable<Match> matches = exp.allMatches(version);
-  assert(matches.length > 0);
-
-  Match m = matches.first;
-  String majorVersion = m.group(1);
+  String majorVersion = channelConfig['version'];
   int buildVersion = int.parse(buildNumber);
 
-  version = '${majorVersion}.${buildVersion}';
+  String version = '${majorVersion}.${buildVersion}';
   manifestDict['version'] = version;
   manifestDict['x-spark-revision'] = revision;
-  manifestDict['name'] = 'Spark Nightly';
-  manifestDict['short_name'] = 'Spark Nightly';
-  manifestDict['description'] = 'A Chrome app based development environment - Nightly version';
-  if (removeKey) {
-    manifestDict.remove('key');
+  manifestDict.remove('key');
+  Map oauth2Config = manifestDict['oauth2'];
+  String clientID = channelConfig['oauth2-clientid'];
+  if (clientID != null) {
+    oauth2Config['client_id'] = clientID;
   }
   file.writeAsStringSync(new JsonPrinter().print(manifestDict));
 
@@ -575,6 +479,25 @@ String _modifyManifestWithDroneIOBuildNumber(GrinderContext context,
   return version;
 }
 
+void _modifyLocaleWithChannelConfig(GrinderContext context,
+                                    Map<String, String> channelConfig) {
+  File file = new File('app/_locales/en/messages.json');
+  String content = file.readAsStringSync();
+  var messagesJson = JSON.decode(content);
+  if (channelConfig['name'] != null) {
+    messagesJson['app_name'] = {'message': channelConfig['name']};
+  }
+  if (channelConfig['description'] != null) {
+    messagesJson['app_description'] = {'message': channelConfig['description']};
+  }
+  file.writeAsStringSync(new JsonPrinter().print(messagesJson));
+
+  // It needs to be copied to compile result directory.
+  copyFile(
+      joinFile(Directory.current, ['app', '_locales', 'en', 'messages.json']),
+      joinDir(BUILD_DIR, ['deploy-out', 'web', '_locales', 'en']));
+}
+
 void _removePackagesLinks(GrinderContext context, Directory target) {
   target.listSync(recursive: true, followLinks: false).forEach((FileSystemEntity entity) {
     if (entity is Link && fileName(entity) == 'packages') {
@@ -583,62 +506,6 @@ void _removePackagesLinks(GrinderContext context, Directory target) {
       _removePackagesLinks(context, entity);
     }
   });
-}
-
-/**
- * Remove a Dartium only reference to the dart:nativewrappers library. dart2js
- * will not be able to compile code with these references.
- */
-void _removeNativeWrappersReference(
-    GrinderContext context, Directory dir, String fileName) {
-  File file = joinFile(dir, [fileName]);
-  String contents = file.readAsStringSync();
-  String modified = _replaceNativeWrappersReference(context, contents);
-  if (modified == contents) {
-    context.log('No reference to dart:nativewrappers found!');
-  } else {
-    context.log('Removing reference to dart:nativewrappers.');
-    file.writeAsStringSync(modified);
-  }
-}
-
-String _replaceNativeWrappersReference(GrinderContext context, String contents) {
-  // Look for `import 'dart:nativewrappers' as smoke_6;`.
-  String importPrefix;
-
-  List<String> lines = contents.split('\n');
-
-  for (String line in lines) {
-    if (line.contains("import 'dart:nativewrappers' as")) {
-      // Remove the trailing semi-colon.
-      line = line.substring(1, line.length - 1);
-
-      // Remove everything preceeding the import prefix - the ` as ` and
-      // everything before it.
-      importPrefix = line.substring(line.lastIndexOf(' ') + 1);
-
-      break;
-    }
-  }
-
-  // Couldn't find the import prefix...
-  if (importPrefix == null) return contents;
-
-  context.log('Found dart:nativewrappers prefix: ${importPrefix}.');
-
-  // Remove lines that contain `importPrefix;` or `importPrefix.` and return the
-  // modified content.
-  return lines.map((String line) {
-    if (line.contains('${importPrefix}.')) {
-      // Remove any line that uses the import prefix.
-      return '// ${line}';
-    } else if (line.contains('${importPrefix};')) {
-      // Remove the line declaring the import prefix.
-      return '// ${line}';
-    } else {
-      return line;
-    }
-  }).join('\n');
 }
 
 /**

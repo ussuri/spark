@@ -127,8 +127,14 @@ Future<List<int>> getAppContentsBinary(String path) {
   String url = chrome.runtime.getURL(path);
 
   return html.HttpRequest.request(url, responseType: 'arraybuffer').then((request) {
-    typed_data.ByteBuffer buffer = request.response;
-    return new typed_data.Uint8List.view(buffer);
+    var response = request.response;
+
+    if (response is List) {
+      return response;
+    } else {
+      typed_data.ByteBuffer buffer = request.response;
+      return new typed_data.Uint8List.view(buffer);
+    }
   });
 }
 
@@ -374,7 +380,11 @@ String minimizeStackTrace(StackTrace st) {
   if (st == null) return '';
 
   List lines = st.toString().trim().split('\n');
-  lines = lines.map((l) => _minimizeLine(l.trim())).toList();
+  lines = lines
+      .map((l) => l.trim())
+      .where((String line) => line.startsWith('at ') || line.startsWith('#'))
+      .map((l) => _minimizeLine(l))
+      .toList();
 
   // Remove all but one 'dart:' frame.
   int index = 0;
@@ -392,7 +402,7 @@ String minimizeStackTrace(StackTrace st) {
     lines = lines.sublist(index - 1);
   }
 
-  return lines.join('\n');
+  return lines.join('#');
 }
 
 // A sample stack trace from Dartium:
@@ -419,6 +429,11 @@ final RegExp DART2JS_REGEX_1 = new RegExp(r'at (\S+) \((\S+)\)');
 final RegExp DART2JS_REGEX_2 = new RegExp(r'at (\S+) (\[.+\]) \((\S+)\)');
 
 String _minimizeLine(String line) {
+  Function minimizePath = (String path) {
+    // Replace a long deployed path with a shorter equivalent.
+    return path.replaceAll('spark_polymer.html_bootstrap.dart.js', 'spark.js');
+  };
+
   // Try and match a dartium stack trace first.
   Match match = DARTIUM_REGEX.firstMatch(line);
 
@@ -426,7 +441,7 @@ String _minimizeLine(String line) {
     String method = match.group(1);
     method = method.replaceAll('<anonymous closure>', '<anon>');
     String location = _removeExtPrefix(match.group(2));
-    return '${method} ${location}';
+    return minimizePath('${method} ${location}');
   }
 
   // Try and match a dart2js stack trace.
@@ -435,7 +450,7 @@ String _minimizeLine(String line) {
   if (match != null) {
     String method = match.group(1);
     String location = _removeExtPrefix(match.group(2));
-    return '${method} ${location}';
+    return minimizePath('${method} ${location}');
   }
 
   // Try and match an alternative dart2js stack trace format.
@@ -444,7 +459,7 @@ String _minimizeLine(String line) {
   if (match != null) {
     String method = match.group(1);
     String location = _removeExtPrefix(match.group(3));
-    return '${method} ${location}';
+    return minimizePath('${method} ${location}');
   }
 
   return line;
@@ -548,4 +563,32 @@ class JsonPrinter {
     _in = _in.substring(2);
     return '\n${_in}';
   }
+}
+
+/**
+ * Downloads a remote file at [url]. Returns the file's text. If file doesn't
+ * exist, returns an empty string.
+ */
+Future<String> downloadFileViaXhr(
+    String url,
+    [String mimeType = 'text\/plain; charset=x-user-defined']) {
+  final completer = new Completer();
+  final request = new html.HttpRequest();
+
+  request.open('GET', url);
+  request.overrideMimeType(mimeType);
+  request.onLoadEnd.listen((event) {
+    if (request.status == 200) {
+      completer.complete(request.responseText);
+    } else if (request.status == 404) {
+      // Remote file doesn't exist.
+      completer.complete('');
+    } else {
+      completer.completeError(
+          "Failed to download '$url': ${request.statusText}");
+    }
+  });
+  request.send();
+
+  return completer.future;
 }

@@ -5,13 +5,14 @@
 /**
  * This class implements the controller for the list of files.
  */
-library spark.ui.widgets.files_controller;
+library spark.ui.files_controller;
 
 import 'dart:async';
 import 'dart:convert' show JSON;
 import 'dart:html' as html;
 
 import 'package:bootjack/bootjack.dart' as bootjack;
+import 'package:logging/logging.dart';
 
 import 'html_utils.dart';
 import 'widgets/file_item_cell.dart';
@@ -20,10 +21,14 @@ import 'widgets/treeview.dart';
 import 'widgets/treeview_cell.dart';
 import 'widgets/treeview_delegate.dart';
 import '../actions.dart';
+import '../dependency.dart';
+import '../decorators.dart';
 import '../event_bus.dart';
 import '../preferences.dart' as preferences;
 import '../scm.dart';
 import '../workspace.dart';
+
+Logger _logger = new Logger('spark.files_controller');
 
 /**
  * An event that is sent to indicate the user would like to select a given
@@ -78,6 +83,9 @@ class FilesController implements TreeViewDelegate {
   Map<String, List<String>> _filteredChildrenCache;
   // Expanded state when no search filter is applied.
   List<String> _currentExpandedState = [];
+  bool visibility = false;
+
+  DecoratorManager _decoratorManager;
 
   FilesController(this._workspace,
                   this._actionManager,
@@ -89,6 +97,9 @@ class FilesController implements TreeViewDelegate {
     _treeView.dropEnabled = true;
     _treeView.draggingEnabled = true;
 
+    _decoratorManager = Dependencies.dependency[DecoratorManager];
+    _decoratorManager.onChanged.listen((_) => _processDecoratorsChange());
+
     _workspace.whenAvailable().then((_) => _addAllFiles());
 
     _workspace.onResourceChange.listen((event) {
@@ -98,7 +109,6 @@ class FilesController implements TreeViewDelegate {
     });
 
     _workspace.onMarkerChange.listen((_) => _processMarkerChange());
-    _scmManager.onStatusChange.listen((_) => _processScmChange());
   }
 
   bool isFileSelected(Resource file) {
@@ -109,7 +119,7 @@ class FilesController implements TreeViewDelegate {
     return _filteredFiles != null ?  _filteredFiles : _files;
   }
 
-   Map<String, List<String>> _currentChildrenCache() {
+  Map<String, List<String>> _currentChildrenCache() {
     return  _filteredChildrenCache != null ? _filteredChildrenCache : _childrenCache;
   }
 
@@ -195,20 +205,20 @@ class FilesController implements TreeViewDelegate {
   ListViewCell treeViewCellForNode(TreeView view, String nodeUid) {
     Resource resource = _filesMap[nodeUid];
     if (resource == null) {
-      print('no resource for ${nodeUid}');
-      assert(resource != null);
+      _logger.warning('no resource for ${nodeUid}');
+      return null;
     }
     FileItemCell cell = new FileItemCell(resource);
     if (resource is Folder) {
       cell.acceptDrop = true;
     }
-    _updateScmInfo(cell);
+    _updateDecoratorInfo(cell);
     return cell;
   }
 
   int treeViewHeightForNode(TreeView view, String nodeUid) {
     Resource resource = _filesMap[nodeUid];
-    return resource is Project ? 40 : 25;
+    return resource is Project ? 40 : FileItemCell.height;
   }
 
   int treeViewDisclosurePositionForNode(TreeView view, String nodeUid) {
@@ -387,7 +397,11 @@ class FilesController implements TreeViewDelegate {
       });
     } else {
       if (_isValidMove(nodesUids, targetNodeUid)) {
-        _workspace.moveTo(nodesUids.map((f) => _filesMap[f]).toList(), destination);
+        _workspace.moveTo(nodesUids.map((f) => _filesMap[f]).toList(), destination)
+          .catchError((e) {
+           // TODO(keertip): show error in dialog
+            throw e;
+          });
       }
     }
   }
@@ -768,7 +782,8 @@ class FilesController implements TreeViewDelegate {
   /**
    * Returns whether the given resource should be filtered from the Files view.
    */
-  bool _showResource(Resource resource) => !resource.isScmPrivate();
+  bool _showResource(Resource resource) =>
+      !resource.isScmPrivate() && (resource.name != '.DS_Store');
 
   /**
    * Traverse all the created [FileItemCell]s, calling `updateFileStatus()`.
@@ -784,30 +799,30 @@ class FilesController implements TreeViewDelegate {
     }
   }
 
-  void _processScmChange() {
+  void _processDecoratorsChange() {
     for (String uid in _filesMap.keys) {
       TreeViewCell treeViewCell = _treeView.getTreeViewCellForUid(uid);
       if (treeViewCell != null) {
-        _updateScmInfo(treeViewCell.embeddedCell);
+        _updateDecoratorInfo(treeViewCell.embeddedCell);
       }
     }
   }
 
-  void _updateScmInfo(FileItemCell fileItemCell) {
+  void _updateDecoratorInfo(FileItemCell fileItemCell) {
     Resource resource = fileItemCell.resource;
-    ScmProjectOperations scmOperations =
-        _scmManager.getScmOperationsFor(resource.project);
+    String decoration = _decoratorManager.getTextDecoration(resource);
+    if (decoration != null) {
+      fileItemCell.setFileInfo(decoration);
+    }
 
-    if (scmOperations != null) {
-      if (resource is Project) {
-        String branchName = scmOperations.getBranchName();
-        if (branchName == null) branchName = '';
-        fileItemCell.setFileInfo('[${branchName}]');
-      }
-
-      ScmFileStatus status = scmOperations.getFileStatus(resource);
-      fileItemCell.setGitStatus(dirty: (status != ScmFileStatus.COMMITTED),
-          added: (status == ScmFileStatus.ADDED));
+    // TODO(devoncarew): Roll the scm decoration into the regular decorator
+    // framework.
+    ScmProjectOperations scm = _scmManager.getScmOperationsFor(resource.project);
+    if (scm != null) {
+      ScmFileStatus status = scm.getFileStatus(resource);
+      fileItemCell.setGitStatus(
+          dirty: status.status != 'committed',
+          added: status.status == 'added');
     }
   }
 
@@ -836,8 +851,8 @@ class FilesController implements TreeViewDelegate {
    */
   void _positionContextMenu(html.Point clickPoint, html.Element contextMenu) {
     var topUi = html.document.querySelector("#topUi");
-    final int separatorHeight = 19;
-    final int itemHeight = 26;
+    final int separatorHeight = 5;
+    final int itemHeight = 35;
     int estimatedHeight = 12; // Start with value padding and border.
     contextMenu.children.forEach((child) {
       estimatedHeight += child.className == "divider" ? separatorHeight : itemHeight;
@@ -954,11 +969,9 @@ class FilesController implements TreeViewDelegate {
   }
 
   /**
-   * Filters the files using [filterString] as part of the name and returns
-   * true if matches are found. If [filterString] is null, cancells all
-   * filtering and returns true.
+   * Filters the files using [filterString] as part of the name.
    */
-  bool performFilter(String filterString) {
+  void performFilter(String filterString) {
     if (filterString != null && filterString.length < 2) {
       filterString = null;
     }
@@ -967,7 +980,7 @@ class FilesController implements TreeViewDelegate {
       _filteredFiles = null;
       _filteredChildrenCache = null;
       _reloadDataAndRestoreExpandedState(_currentExpandedState);
-      return true;
+      _setShowNoResults(false);
     } else {
       Set<String> filtered = new Set();
       _filteredFiles = [];
@@ -986,7 +999,12 @@ class FilesController implements TreeViewDelegate {
       });
 
       _reloadDataAndRestoreExpandedState(filtered.toList());
-      return _filteredFiles.isNotEmpty;
+      _setShowNoResults(_filteredFiles.isEmpty);
     }
+  }
+
+  void _setShowNoResults(bool visible) {
+    html.querySelector('#fileViewFilterNoResult').classes.toggle('hidden',
+        !visible || !visibility);
   }
 }

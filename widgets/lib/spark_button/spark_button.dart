@@ -21,6 +21,7 @@ class SparkButton extends SparkWidget {
   @attribute bool disabled;
   @attribute bool active;
   @attribute String tooltip;
+  @attribute bool highlight = true;
 
   SparkButton.created() : super.created();
 

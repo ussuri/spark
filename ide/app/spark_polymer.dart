@@ -11,6 +11,7 @@ import 'package:chrome/chrome_app.dart' as chrome;
 import 'package:polymer/polymer.dart' as polymer;
 import 'package:spark_widgets/spark_button/spark_button.dart';
 import 'package:spark_widgets/spark_dialog/spark_dialog.dart';
+import 'package:spark_widgets/spark_splitter/spark_splitter.dart';
 
 import 'spark.dart';
 import 'spark_bootstrap.dart';
@@ -125,11 +126,13 @@ class SparkPolymerDialog implements Dialog {
 class SparkPolymer extends Spark {
   SparkPolymerUI _ui;
 
-  Future openFolder(chrome.DirectoryEntry entry) {
+  Future<SparkJobStatus> openFolder(chrome.DirectoryEntry entry) {
     return _beforeSystemModal()
         .then((_) => super.openFolder(entry))
-        .then((_) => _systemModalComplete())
-        .catchError((e) => _systemModalComplete());
+        .then((status) {
+          _systemModalComplete();
+          return status;
+        }).catchError((e) => _systemModalComplete());
   }
 
   Future openFile() {
@@ -139,10 +142,9 @@ class SparkPolymer extends Spark {
         .catchError((e) => _systemModalComplete());
   }
 
-  Future importFolder([List<ws.Resource> resources,
-                       chrome.DirectoryEntry entry]) {
+  Future<SparkJobStatus> importFolder([List<ws.Resource> resources]) {
     return _beforeSystemModal()
-        .then((_) => super.importFolder(resources, entry))
+        .then((_) => super.importFolder(resources))
         .whenComplete(() => _systemModalComplete());
   }
 
@@ -200,17 +202,44 @@ class SparkPolymer extends Spark {
   void initEditorManager() => super.initEditorManager();
 
   @override
-  void initEditorArea() => super.initEditorArea();
+  void initEditorArea() {
+    super.initEditorArea();
+
+    // TODO(ussuri): Redo once the TODO before #aceContainer in *.html is done.
+    final SparkSplitter outlineResizer = querySelector('#outlineResizer');
+    syncPrefs.getValue('outlineSize', '200').then((String position) {
+      int value = int.parse(position, onError: (_) => null);
+      if (value != null) {
+        // TODO(ussuri): BUG #2252. Note: deliverChanges() here didn't work
+        // in deployed code, unlike the similar snippet below.
+        outlineResizer
+            ..targetSize = value
+            ..targetSizeChanged();
+      }
+    });
+    outlineResizer.on['update'].listen(_onOutlineSizeUpdate);
+  }
 
   @override
   void initSplitView() {
     syncPrefs.getValue('splitViewPosition', '300').then((String position) {
       int value = int.parse(position, onError: (_) => null);
       if (value != null) {
-        _ui.splitViewPosition = value;
-        _ui.deliverChanges();
+        // TODO(ussuri): BUG #2252.
+        _ui
+            ..splitViewPosition = value
+            ..deliverChanges();
       }
     });
+  }
+
+  int _mouseX = -1;
+  int _mouseY = -1;
+  bool mouseInStatusArea = false;
+  static const int statusComponentHeight = 60;
+
+  void updateStatusVisibility() {
+    statusComponent.classes.toggle('hovered', mouseInStatusArea);
   }
 
   @override
@@ -239,6 +268,28 @@ class SparkPolymer extends Spark {
         statusComponent.progressMessage = event.toString();
       }
     });
+
+    Function updateMousePosition = ((e) {
+      if (e == null) {
+        _mouseX = -1;
+        _mouseY = -1;
+      } else {
+        _mouseX = e.page.x;
+        _mouseY = e.page.y;
+      }
+      if (_mouseX == -1) {
+        mouseInStatusArea = false;
+        updateStatusVisibility();
+        return;
+      }
+      mouseInStatusArea =
+          (document.body.clientHeight - _mouseY <= statusComponentHeight);
+      updateStatusVisibility();
+    });
+    Element editorArea = querySelector('#editorArea');
+    editorArea.onMouseMove.listen(updateMousePosition);
+    editorArea.onMouseEnter.listen(updateMousePosition);
+    editorArea.onMouseLeave.listen((e) => updateMousePosition(null));
   }
 
   @override
@@ -266,11 +317,6 @@ class SparkPolymer extends Spark {
   @override
   Future restoreLocationManager() => super.restoreLocationManager();
 
-  @override
-  void menuActivateEventHandler(CustomEvent event) {
-    _ui.onMenuSelected(event, event.detail);
-  }
-
   //
   // - End parts of the parent's init().
   //
@@ -278,6 +324,13 @@ class SparkPolymer extends Spark {
   @override
   void onSplitViewUpdate(int position) {
     syncPrefs.setValue('splitViewPosition', position.toString());
+  }
+
+  // TODO(ussuri): Redo once the TODO before #aceContainer in *.html is done.
+  void _onOutlineSizeUpdate(CustomEvent e) {
+    syncPrefs.setValue('outlineSize', e.detail['targetSize'].toString());
+    // The top-level [spark-split-view] in [_ui] also listens to the same event.
+    e.stopImmediatePropagation();
   }
 
   void _bindButtonToAction(String buttonId, String actionId) {
