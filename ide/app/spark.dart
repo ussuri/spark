@@ -493,6 +493,7 @@ abstract class Spark
     actionManager.registerAction(new BowerUpgradeAction(this));
     actionManager.registerAction(new CspFixAction(this));
     actionManager.registerAction(new ApplicationRunAction.run(this));
+    actionManager.registerAction(new ApplicationRunAction.runCustom(this));
     actionManager.registerAction(new ApplicationRunAction.deploy(this));
     actionManager.registerAction(new CompileDartAction(this));
     actionManager.registerAction(new GitCloneAction(this, getDialogElement("#gitCloneDialog")));
@@ -1699,27 +1700,54 @@ class ApplicationRunAction extends SparkAction implements ContextAction {
   LaunchTarget _launchTarget;
   String _launchText;
 
-  ApplicationRunAction.run(Spark spark) : super(spark, "application-run", "Run") {
+  static const _OS_PROXY_ID = 'com.google.chromedeveditor.os_proxy';
+  chrome.Port _osProxyPort;
+  String _customBinaryPath =
+      '/Applications/dart/chromium/Chromium.app/Contents/MacOS/Chromium';
+
+  ApplicationRunAction.run(Spark spark) :
+      super(spark, 'application-run', "Run…") {
     _launchTarget = LaunchTarget.LOCAL;
-    _launchText = 'Running';
-    addBinding("ctrl-r");
+    _launchText = "Running";
+    addBinding('ctrl-r');
     enabled = false;
     spark.focusManager.onResourceChange.listen((r) => _updateEnablement(r));
   }
 
+  ApplicationRunAction.runCustom(Spark spark) :
+      super(spark, 'appication-run-custom', "Run Custom...") {
+    _launchTarget = LaunchTarget.LOCAL_CUSTOM;
+    _launchText = "Running custom";
+    enabled = false;
+    spark.focusManager.onResourceChange.listen((r) => _updateEnablement(r));
+
+    try {
+      _osProxyPort =
+          chrome.runtime.connectNative(_OS_PROXY_ID);
+      _osProxyPort.onMessage.addListener((String msg) {
+        _logger.info("Response from OS proxy: " + msg);
+      });
+      _osProxyPort.onDisconnect.addListener(() {
+        _logger.info("OS proxy disconnected");
+      });
+    } catch (e, s) {
+      _logger.error("Failed to connect to OS proxy: $e\n$s");
+    }
+  }
+
   ApplicationRunAction.deploy(Spark spark) :
-      super(spark, "application-push", "Deploy to Mobile…") {
+      super(spark, 'application-push', "Deploy to Mobile…") {
     _launchTarget = LaunchTarget.REMOTE;
-    _launchText = 'Deploying';
+    _launchText = "Deploying";
     enabled = false;
     spark.focusManager.onResourceChange.listen((r) => _updateEnablement(r));
   }
 
   void _invoke([context]) {
     if (!enabled) {
-      spark.showErrorMessage('Unable to Deploy',
-          message: 'Unable to deploy the current selection; please select an '
-          'application to deploy.');
+      spark.showErrorMessage("Unable to Run/Deploy",
+          message: "Unable to run/deploy the current selection; "
+                   "please select an application or file to run/deploy.");
       return;
     }
 
@@ -1731,6 +1759,14 @@ class ApplicationRunAction extends SparkAction implements ContextAction {
       resource = context.first;
     }
 
+    if (_launchTarget == LaunchTarget.LOCAL_CUSTOM) {
+      _osProxyPort.postMessage({
+        'launch': '$_customBinaryPath http://www.google.com'
+      });
+      return;
+    }
+
+    // TODO(ussuri): Why is this completer needed?
     Completer<SparkJobStatus> completer = new Completer<SparkJobStatus>();
     spark.launchManager.performLaunch(resource, _launchTarget).then((_) {
       completer.complete();

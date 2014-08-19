@@ -1,0 +1,11 @@
+{
+  "name": "com.google.chromedeveditor.os_proxy",
+  "description": "OS proxy for Chrome Dev Editor",
+  "path": "/Users/sergeygs/work/projects/spark/workspace/.cde/chromedeveditor_os_proxy.dart",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://kcjgcakhgelcejampmijgkjkadfcncjl/",
+    "chrome-extension://hpenkfongmodpaiknffeeeohcoilclii/",
+    "chrome-extension://pnoffddplpippgcfjdhbmhkofpnaalpg/"
+  ]
+}

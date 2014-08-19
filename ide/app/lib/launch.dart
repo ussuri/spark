@@ -181,6 +181,10 @@ class LaunchTarget extends Enum<String> {
   /// A local target - executing on the local device.
   static const LOCAL = const LaunchTarget._('local');
 
+  /// A local custom target - executing on the local device using an external
+  /// binary of the user's choice.
+  static const LOCAL_CUSTOM = const LaunchTarget._('local_custom');
+
   /// A remote deploy - typically, executing on a mobile device.
   static const REMOTE = const LaunchTarget._('remote');
 
