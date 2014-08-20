@@ -1725,13 +1725,13 @@ class ApplicationRunAction extends SparkAction implements ContextAction {
       _osProxyPort =
           chrome.runtime.connectNative(_OS_PROXY_ID);
       _osProxyPort.onMessage.addListener((String msg) {
-        _logger.info("Response from OS proxy: " + msg);
+        print("Response from OS proxy: " + msg);
       });
       _osProxyPort.onDisconnect.addListener(() {
-        _logger.info("OS proxy disconnected");
+        print("OS proxy disconnected");
       });
     } catch (e, s) {
-      _logger.error("Failed to connect to OS proxy: $e\n$s");
+      print("Failed to connect to OS proxy: $e\n$s");
     }
   }
 
