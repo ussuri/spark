@@ -83,10 +83,13 @@ class SparkStatus extends SparkWidget {
   }
 
   @override
-  void ready() {
+  void attached() {
+    super.attached();
+
     _container = getShadowDomElement('#status-container');
     _label = getShadowDomElement('#label');
     _throbber = getShadowDomElement('#throbber');
+    _update();
   }
 
   bool get _showingProgressMessage =>

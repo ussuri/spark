@@ -10,10 +10,12 @@ import 'dart:html' hide File;
 
 import 'package:chrome/chrome_app.dart' as chrome;
 
+import '../package_mgmt/bower_properties.dart';
 import '../utils.dart' as utils;
 import '../workspace.dart';
 
 part 'addons/bower_deps/template.dart';
+part 'chrome/chrome_app_polymer_js/template.dart';
 part 'polymer/template.dart';
 part 'polymer/polymer_element_dart/template.dart';
 part 'polymer/polymer_element_js/template.dart';
@@ -41,15 +43,16 @@ class TemplateVar {
 class ProjectBuilder {
   DirectoryEntry _destRoot;
   List<ProjectTemplate> _templates = [];
+  utils.Notifier _notifier;
 
-  ProjectBuilder(this._destRoot, this._templates);
+  ProjectBuilder(this._destRoot, this._templates, this._notifier);
 
   /**
    * Build the sample project and complete the Future when finished.
    */
   Future build() {
     return Future.forEach(_templates, (ProjectTemplate template) {
-      return template.build(_destRoot);
+      return template.instantiate(_destRoot, _notifier);
     });
   }
 
@@ -58,23 +61,27 @@ class ProjectBuilder {
    * file we should show to the user after a project is created.
    */
   static Resource getMainResourceFor(Project project) {
-    Resource r;
+    // Look for `manifest.json` or `index.html`.
+    Function fileMatch = (Iterable<Resource> resources) {
+      return resources.firstWhere((r) => r.name == 'manifest.json',
+          orElse: () => resources.firstWhere((r) => r.name == 'index.html',
+          orElse: () => null));
+    };
 
-    r = project.getChild('manifest.json');
-    if (r != null) return r;
-
-    final Folder web = project.getChild('web');
+    Folder web = project.getChild('web');
     if (web != null) {
-      r = web.getChildren().firstWhere((c) {
-        return c.name.endsWith('.dart') ||
-               c.name.endsWith('.js') ||
-               c.name.endsWith('.html');
-      }, orElse: null);
-      if (r != null) return r;
+      Resource match = fileMatch(web.getChildren());
+      if (match != null) return match;
     }
 
-    r = project.getChild('index.html');
-    if (r != null) return r;
+    Folder app = project.getChild('app');
+    if (app != null) {
+      Resource match = fileMatch(app.getChildren());
+      if (match != null) return match;
+    }
+
+    Resource match = fileMatch(project.getChildren());
+    if (match != null) return match;
 
     return project;
   }
@@ -101,6 +108,8 @@ class ProjectTemplate {
     switch (id) {
       case 'addons/bower_deps':
         return new BowerDepsTemplate(id, globalVars, localVars);
+      case 'chrome/chrome_app_polymer_js':
+        return new ChromeAppWithPolymerJSTemplate(id, globalVars, localVars);
       case 'polymer/polymer_element_js':
         return new PolymerJSTemplate(id, globalVars, localVars);
       case 'polymer/polymer_element_dart':
@@ -134,6 +143,9 @@ class ProjectTemplate {
     }
   }
 
+  Future instantiate(DirectoryEntry destRoot, utils.Notifier notifier) =>
+      build(destRoot).then((_) => showIntro(notifier));
+
   Future build(DirectoryEntry destRoot) {
     DirectoryEntry sourceRoot;
 
@@ -147,6 +159,10 @@ class ProjectTemplate {
       final Map m = JSON.decode(contents);
       return _traverseElement(destRoot, sourceRoot, _sourceUri, m);
     });
+  }
+
+  Future showIntro(utils.Notifier notifier) {
+    return new Future.value();
   }
 
   String _interpolateTemplateVars(String text) {

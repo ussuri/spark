@@ -13,8 +13,10 @@ import 'dart:async';
 import 'package:intl/intl.dart';
 import 'package:logging/logging.dart';
 
-import 'workspace.dart';
 import 'jobs.dart';
+import 'package_mgmt/package_utils.dart';
+import 'spark_flags.dart';
+import 'workspace.dart';
 
 final Logger _logger = new Logger('spark.builder');
 final NumberFormat _nf = new NumberFormat.decimalPattern();
@@ -29,9 +31,9 @@ class BuilderManager {
   final Workspace workspace;
   final JobManager jobManager;
 
-  List<Builder> builders = [];
+  final List<Builder> builders = [];
 
-  List<ResourceChangeEvent> _events = [];
+  final List<ResourceChangeEvent> _events = [];
 
   Timer _timer;
   bool _buildRunning = false;
@@ -42,7 +44,7 @@ class BuilderManager {
 
   bool get isRunning => _buildRunning;
 
-  List<Completer> _completers = [];
+  final List<Completer> _completers = [];
 
   /**
    * Returns a [Future] that will complete when all current builds are finished.
@@ -80,7 +82,16 @@ class BuilderManager {
 
     if (event.isEmpty) return;
 
-    _logger.info('starting build for ${event.changes}');
+    if (SparkFlags.developerMode) {
+      String changeStr = '${event.changes}';
+      if (changeStr.length > 200) {
+        changeStr = changeStr.substring(0, 200) + "...";
+      }
+      _logger.info('starting build for ${changeStr}');
+    } else {
+      _logger.info('starting build');
+    }
+
     Stopwatch timer = new Stopwatch()..start();
 
     _buildRunning = true;
@@ -115,16 +126,24 @@ abstract class Builder {
    * Process a set of resource changes and complete the [Future] when finished.
    */
   Future build(ResourceChangeEvent event, ProgressMonitor monitor);
+
+  /**
+   * Return only those changes that did not occur in a packages directory.
+   */
+  Iterable<ChangeDelta> filterPackageChanges(Iterable<ChangeDelta> changes) {
+    return changes.where(
+        (ChangeDelta delta) => !isInPackagesFolder(delta.resource));
+  }
 }
 
 class _BuildJob extends Job {
   final ResourceChangeEvent event;
   final List<Builder> builders;
-  final Completer completer;
 
-  _BuildJob(this.event, this.builders, this.completer) : super('Building…');
+  _BuildJob(this.event, this.builders, Completer completer)
+      : super('Building…', completer);
 
-  Future run(ProgressMonitor monitor) {
+  Future<SparkJobStatus> run(ProgressMonitor monitor) {
     return Future.forEach(builders, (Builder builder) {
       Future f = builder.build(event, monitor);
       assert(f != null);
@@ -133,7 +152,8 @@ class _BuildJob extends Job {
     }).catchError((e, st) {
       _logger.severe('Exception from build manager', e, st);
     }).whenComplete(() {
-      completer.complete();
+      done(new SparkJobStatus(
+          code: SparkStatusCodes.SPARK_JOB_BUILD_SUCCESS));
     });
   }
 }
@@ -142,7 +162,9 @@ class _BuildJob extends Job {
 
 ResourceChangeEvent _combineEvents(List<ResourceChangeEvent> events) {
   List<ChangeDelta> deltas = [];
-  events.forEach((e) => deltas.addAll(
-      e.changes.where((change) => !change.resource.isDerived())));
+  events.forEach((e) => deltas.addAll(e.changes.where((ChangeDelta change) {
+    Resource resource = change.resource;
+    return resource.project != null && !resource.isDerived();
+  })));
   return new ResourceChangeEvent.fromList(deltas, filterRename: true);
 }

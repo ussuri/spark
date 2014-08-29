@@ -7,14 +7,13 @@ library spark.ace_test;
 import 'dart:async';
 import 'dart:html';
 
-import 'package:ace/ace.dart' as ace;
 import 'package:unittest/unittest.dart';
 
 import '../lib/ace.dart';
 import '../lib/navigation.dart';
 import '../lib/outline.dart';
 import '../lib/workspace.dart' as workspace;
-import '../lib/ui/polymer/goto_line_view/goto_line_view.dart';
+import '../lib/ui/goto_line_view/goto_line_view.dart';
 import '../lib/preferences.dart';
 
 defineTests() {
@@ -45,7 +44,7 @@ class MockAceManager implements AceManager {
   void setSelectionAnchor(int row, int column) {}
   void selectTo(int row, int column) {}
 
-  ace.EditSession get currentSession => null;
+  EditSession get currentSession => null;
   void focus() { }
   void resize() { }
   void setTheme(String theme) { }
@@ -65,6 +64,8 @@ class MockAceManager implements AceManager {
   void buildOutline() { }
   Stream get onGotoDeclaration => null;
   NavigationLocation get navigationLocation => null;
+  void setupOutline(Element parentElement) { }
+  Future prepareForLinking(workspace.Project project) => new Future.value();
 }
 
 class MockAceEditor implements TextEditor {
@@ -81,7 +82,7 @@ class MockAceEditor implements TextEditor {
   void deactivate() { }
   void reconcile() { }
 
-  BoolCachedPreference get stripWhitespace => null;
+  JsonPreference<bool> get stripWhitespace => null;
   bool get dirty => false;
 
   set dirty(bool value) { }
@@ -92,7 +93,7 @@ class MockAceEditor implements TextEditor {
 
   Future save() => new Future.value();
 
-  void setSession(ace.EditSession value) { }
+  void setSession(EditSession value) { }
 
   void fileContentsChanged() { }
 
@@ -103,6 +104,9 @@ class MockAceEditor implements TextEditor {
   void select(Span span) { }
   void format() { }
   Future navigateToDeclaration([Duration timeLimit]) => null;
+  int getCursorOffset() => 0;
+
+  void customizeSession(EditSession session) { }
 }
 
 class MockEditSession implements EditSession {

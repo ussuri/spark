@@ -29,8 +29,8 @@ class SparkSplitView extends SparkWidget {
   SparkSplitView.created() : super.created();
 
   @override
-  void enteredView() {
-    super.enteredView();
+  void attached() {
+    super.attached();
     // Make sure there are exactly 2 children inserted in the instantiation
     // site. When we're enclosed in another element and passed down its
     // <content>, we need to dive into that <content> to look at its distributed
@@ -49,7 +49,7 @@ class SparkSplitView extends SparkWidget {
     // changes in [targetSize] to the enclosed splitter. Investigate.
     _splitter.targetSize = targetSize;
     if (IS_DART2JS) {
-      // TODO(ussuri): In the deployed code, even the above wasn't enough.
+      // TODO(ussuri): BUG #2252. In the deployed code, even the above wasn't enough.
       _splitter.targetSizeChanged();
     }
   }

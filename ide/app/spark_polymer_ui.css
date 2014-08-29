@@ -17,8 +17,16 @@
   top: 0;
 }
 
+[beforeSplit] {
+  box-shadow: rgba(0, 0, 0, 0.2) 1px 0px 2px;
+}
+
+[afterSplit] {
+  z-index: -1;
+}
+
 spark-dialog {
-  top: 72px;
+  top: 15%;
   left: 50%;
   width: 512px;
   margin-left: -256px;
@@ -39,25 +47,43 @@ spark-dialog {
   margin: 0;
 }
 
+#fileFilterGroup {
+  flex: 1;
+  display: flex;
+}
+
 #fileFilter {
-  background: #fff url(images/search.png) 10px center no-repeat;
+  flex: 1;
+  height: 36px;
+  padding: 10px 10px 10px 44px;
   border: 1px solid #ddd;
   border-radius: 3px;
-  height: 36px;
-  flex: 1;
-  font: inherit;
-  margin: 2px;
-  padding: 10px 10px 10px 44px;
 }
 
 #fileFilter:focus {
-  border: 1px solid #9DBEFF;
+  border: 1px solid #4285f4;
+  box-shadow: 0 0 0 1px #4285f4;
   outline: none;
+}
+
+#fileFilter ~ #runButton,
+#fileFilter ~ #mainMenu {
+  transition: all 0.25s cubic-bezier(0.4, 0, 1, 1);
 }
 
 #fileFilter:focus.active ~ #runButton,
 #fileFilter:focus.active ~ #mainMenu {
-  display: none;
+  opacity: 0;
+  margin: 0;
+  width: 0;
+}
+
+#moreSearchMenu {
+  position: absolute;
+  left: 92px;
+  top: 10px;
+  width: 32px;
+  height: 32px;
 }
 
 #fileNotFoundPlaceholder {
@@ -69,16 +95,11 @@ spark-dialog {
 }
 
 #navigationButtons {
+  border: none;
   position: absolute;
   right: 0;
   width: 95px;
   z-index: 150;
-}
-
-#runButton > i,
-#leftNav > i,
-#rightNav > i {
-  font-size: 16px;
 }
 
 #sparkStatusContainer {
@@ -89,6 +110,10 @@ spark-dialog {
   right: 0;
   text-align: center;
   z-index: 101;
+}
+
+#sparkStatus.hovered {
+  opacity: 0.1;
 }
 
 #settingsDialog .settings-label {
@@ -104,6 +129,7 @@ spark-dialog {
   color: #666;
   text-align: center;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 #settingsDialog .settings-block {
@@ -112,12 +138,12 @@ spark-dialog {
   background-color: white;
 }
 
-#settingsDialog .plus-minus-button {
+#settingsDialog .change-setting-button {
   width: 30px;
   height: 30px;
 }
 
-.settings-value + .plus-minus-button {
+#settingsDialog .settings-value + .change-setting-button {
   margin-left: 5px;
 }
 
@@ -126,16 +152,43 @@ spark-dialog {
   height: 100%;
 }
 
+#gitRepoUrlCopyInBuffer {
+  width: 0px;
+  height: 1px;
+  background: transparent;
+  box-shadow: 0px 0px 0px;
+  padding: 0px;
+  border: 0px solid;
+}
+
+#aboutDialog #logo {
+  margin-right: 40px;
+}
+
+#aboutDialog #analyticsOptIn {
+  margin-top: 40px;
+}
+
+#aboutDialog #analyticsCheck {
+  margin: 0 20px;
+}
+
+#errorMessage {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
 #gitResetSettingsDone,
 #preferenceResetResult {
   display: none;
   color: #F00;
-  font-weight: bold;
+  font-weight: 500;
+  margin: 4px 0 0 4px;
 }
 
 #gitCommitList {
   max-height: 250px;
-  overflow: scroll;
+  overflow: auto;
   padding: 0 20px;
 }
 
@@ -146,7 +199,7 @@ spark-dialog {
 }
 
 #gitChangeList {
-  border-radius: 4px;
+  border-radius: 3px;
   border: 1px solid #cccccc;
   display: none;
   margin-bottom: 15px;
@@ -167,15 +220,12 @@ spark-dialog {
   display: none;
 }
 
-/* Deploy to mobile dialog */
-#mobileDeployDialog .modal-body {
-  padding-top: 10px;
-  padding-bottom: 0;
+#pushUrl {
+  width: 20em;
 }
 
-#pushUrl {
-  margin-left: 17px;
-  width: 20em;
+.radio-button-dependency {
+  margin: 10px 0 0 20px;
 }
 
 .input-label {
@@ -194,10 +244,45 @@ spark-dialog {
   flex: 1 1 auto;
 }
 
-#webStorePublishDialog label {
-  margin-left: 5px;
-}
-
 [selectableTxt] {
   -webkit-user-select: text;
 }
+
+#bottom-toolbar {
+  border-top: 1px solid #ddd;
+  bottom: 0;
+  position: absolute;
+  width: 100%;
+}
+
+/* Override Bootstrap's 'font-weight: bold' style for labels */
+label {
+  font-weight: 500;
+}
+
+.help-block {
+  -webkit-user-select: text;
+}
+
+/* These two are special (secondary) */
+label[for="analyticsCheck"],
+label[for="stripWhitespace"] {
+  font-weight: 400;
+}
+
+#aboutDialog-icon {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+#aboutDialog-text {
+  display: inline-block;
+  margin-left: 10px;
+  vertical-align: middle;
+}
+
+#directoryLabel {
+  overflow: hidden;
+  white-space: nowrap;
+}
+

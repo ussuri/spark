@@ -7,7 +7,6 @@
 /**
  * Bower services.
  */
-
 library spark.package_mgmt.bower;
 
 import 'dart:async';
@@ -15,15 +14,19 @@ import 'dart:convert' show JSON;
 
 import 'package:logging/logging.dart';
 
-import 'package_manager.dart';
 import 'bower_fetcher.dart';
 import 'bower_properties.dart';
+import 'package_manager.dart';
 import '../jobs.dart';
 import '../workspace.dart';
 
 Logger _logger = new Logger('spark.bower');
 
 class BowerManager extends PackageManager {
+  /**
+   * Create a new [BowerManager] instance. This is a heavy-weight object; it
+   * creates a new [Builder].
+   */
   BowerManager(Workspace workspace) : super(workspace);
 
   //
@@ -37,34 +40,42 @@ class BowerManager extends PackageManager {
   PackageResolver getResolverFor(Project project) =>
       new _BowerResolver._(project);
 
-  Future installPackages(Container container) =>
-      _installOrUpgradePackages(container.project, FetchMode.INSTALL);
+  Future installPackages(Folder container, ProgressMonitor monitor) =>
+      _installOrUpgradePackages(container.project, FetchMode.INSTALL, monitor);
 
-  Future upgradePackages(Container container) =>
-      _installOrUpgradePackages(container.project, FetchMode.UPGRADE);
+  Future upgradePackages(Folder container, ProgressMonitor monitor) =>
+      _installOrUpgradePackages(container.project, FetchMode.UPGRADE, monitor);
+
+  // TODO(keertip): implement for bower
+  Future<dynamic> arePackagesInstalled(Folder container) =>
+      new Future.value(true);
 
   //
   // - end PackageManager abstract interface.
   //
 
-  Future _installOrUpgradePackages(Project project, FetchMode mode) {
-    final File specFile = project.getChild(properties.packageSpecFileName);
+  Future _installOrUpgradePackages(
+      Folder container, FetchMode mode, ProgressMonitor monitor) {
+    final File specFile = container.getChild(properties.packageSpecFileName);
 
     // The client is expected to call us only when the project has bower.json.
     if (specFile == null) {
-      throw new StateError('installPackages() called, but there is no bower.json');
+      throw new StateError(
+          '${properties.packageSpecFileName} not found under ${container.name}');
     }
 
-    return project.getOrCreateFolder(properties.packagesDirName, true)
+    return container.getOrCreateFolder(properties.packagesDirName, true)
         .then((Folder packagesDir) {
       final fetcher = new BowerFetcher(
-          packagesDir.entry, properties.packageSpecFileName);
+          packagesDir.entry, properties.packageSpecFileName, monitor);
 
-      return fetcher.fetchDependencies(specFile.entry, mode).whenComplete(() {
-        return project.refresh();
-      }).catchError((e) {
+      return fetcher.fetchDependencies(specFile.entry, mode).catchError((e) {
         _logger.severe('Error getting Bower packages', e);
         return new Future.error(e);
+      }).then((_) {
+        // Delay refreshing of the folder until after Bower is completely done.
+        // This is needed to fix BUG #2946.
+        return Timer.run(() => container.refresh());
       });
     });
   }
@@ -74,6 +85,9 @@ class BowerManager extends PackageManager {
  * A package resolver for Bower.
  */
 class _BowerResolver extends PackageResolver {
+  static final PACKAGE_REF_PREFIX_RE =
+      new RegExp('^(../|.*/${bowerProperties.packagesDirName}/)');
+
   final Project project;
 
   _BowerResolver._(this.project);
@@ -85,11 +99,13 @@ class _BowerResolver extends PackageResolver {
   PackageServiceProperties get properties => bowerProperties;
 
   File resolveRefToFile(String url) {
-    if (url.startsWith('/')) url = url.substring(1);
-    if (url.isEmpty) return null;
-
     Folder folder = project.getChild(bowerProperties.packagesDirName);
     if (folder == null) return null;
+
+    if (url.isEmpty) return null;
+    url = url.replaceFirst(PACKAGE_REF_PREFIX_RE, '');
+
+    if (url.startsWith('/')) url = url.substring(1);
 
     return folder.getChildPath(url);
   }
@@ -97,6 +113,8 @@ class _BowerResolver extends PackageResolver {
   // Not used by anybody, but could return something like
   // `/bower_components/foo/bar.js`.
   String getReferenceFor(File file) => null;
+
+  String toString() => 'Bower resolver for ${project}';
 }
 
 /**
@@ -115,7 +133,7 @@ class _BowerBuilder extends PackageBuilder {
   Future build(ResourceChangeEvent event, ProgressMonitor monitor) {
     List futures = [];
 
-    for (ChangeDelta delta in event.changes) {
+    for (ChangeDelta delta in filterPackageChanges(event.changes)) {
       Resource r = delta.resource;
 
       if (r.isDerived()) continue;

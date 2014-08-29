@@ -6,25 +6,31 @@ library git.utils;
 
 import 'dart:async';
 import 'dart:core';
-import 'dart:typed_data';
 
 import 'package:chrome/chrome_app.dart' as chrome;
 import 'package:logging/logging.dart';
 
+import 'constants.dart';
 import 'fast_sha.dart';
 import 'file_operations.dart';
 
-Logger logger = new Logger('spark.git');
+final Logger logger = new Logger('spark.git');
+final RegExp _gitUrlRegExp = new RegExp(GIT_URL_PATTERN);
+
+/**
+ * Returns true if [url] is a git URL.
+ */
+bool isGitUri(String uri) => _gitUrlRegExp.hasMatch(uri);
 
 /**
  * Convertes [sha] string to sha bytes.
  */
-Uint8List shaToBytes(String sha) {
+List<int> shaToBytes(String sha) {
   List<int> bytes = [];
   for (var i = 0; i < sha.length; i += 2) {
     bytes.add(int.parse('0x' + sha[i] + sha[i+1]));
   }
-  return new Uint8List.fromList(bytes);
+  return bytes;
 }
 
 /**

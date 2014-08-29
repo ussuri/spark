@@ -67,8 +67,13 @@ class Tab {
   String get label => _labelCaption.innerHtml;
   set label(String label) {
     _labelCaption.innerHtml = label;
-    _labelCaption.title = _labelCaption.text;
   }
+
+  String get tooltip => _labelCaption.title;
+  set tooltip(String label) {
+    _labelCaption.title = label;
+  }
+
   CssStyleDeclaration get labelStyle => _labelCaption.style;
   ElementEvents get labelEvents => _labelCaption.on;
 
@@ -111,7 +116,10 @@ class Tab {
 
   void focus() => _pageContainer.focus();
 
-  bool close() => tabView.remove(this);
+  bool close() {
+    deactivate();
+    return tabView.remove(this);
+  }
 
   void validatePage() {
     if (_page != null && _page.parent != _pageContainer)
@@ -287,8 +295,8 @@ class TabView {
     var scroller = _tabBarScroller;
       if (label.offsetWidth + label.offsetLeft > scroller.offsetWidth +
           scroller.scrollLeft - scroller.offsetLeft - SCROLL_MARGIN) {
-        scroller.scrollLeft = label.offsetWidth + label.offsetLeft -
-            scroller.offsetWidth + scroller.offsetLeft + SCROLL_MARGIN;
+        scroller.scrollLeft = (label.offsetWidth + label.offsetLeft -
+            scroller.offsetWidth + scroller.offsetLeft + SCROLL_MARGIN).toInt();
       } else if (label.offsetLeft < scroller.scrollLeft + SCROLL_MARGIN) {
         scroller.scrollLeft = label.offsetLeft.toInt() - SCROLL_MARGIN;
       }

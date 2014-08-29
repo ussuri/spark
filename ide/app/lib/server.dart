@@ -119,7 +119,7 @@ abstract class PicoServlet {
  * An object that contains the content of and information of an HTTP request.
  */
 class HttpRequest {
-  static final HEADER_END = [13, 10, 13, 10];
+  static const _HEADER_END = const[13, 10, 13, 10];
 
   static Future<HttpRequest> _parse(tcp.TcpClient client) {
     Completer<HttpRequest> completer = new Completer();
@@ -136,13 +136,13 @@ class HttpRequest {
       for (; i < data.length; i++) {
         collectedData.add(data[i]);
 
-        if (data[i] == HEADER_END[statePos]) {
+        if (data[i] == _HEADER_END[statePos]) {
           statePos++;
         } else {
           statePos = 0;
         }
 
-        if (statePos == HEADER_END.length){
+        if (statePos == _HEADER_END.length){
           sub.cancel();
 
           List remainingData = (i + 1 < data.length ? data.sublist(i + 1) : []);
@@ -184,7 +184,18 @@ class HttpRequest {
 
     if (strs.length > 2) {
       method = strs[0];
-      path = new Uri(path: strs[1]);
+
+      String file = strs[1];
+      String query = null;
+
+      int index = file.indexOf('?');
+
+      if (index != -1) {
+        query = file.substring(index + 1);
+        file = file.substring(0, index);
+      }
+
+      path = new Uri(path: file, query: query);
       version = _parseVersion(strs[2]);
     }
 
@@ -266,13 +277,13 @@ class HttpResponse {
    * [HttpStatus]. If no status code is explicitly set the default
    * value [HttpStatus.OK] is used.
    */
-  int statusCode;
+  final int statusCode;
 
   /**
    * Gets and sets the reason phrase. If no reason phrase is explicitly
    * set a default reason phrase is provided.
    */
-  String reasonPhrase;
+  final String reasonPhrase;
 
   List<int> _data;
   Stream<List<int>> _streamData;
@@ -280,10 +291,10 @@ class HttpResponse {
   /**
    * The response headers.
    */
-  HttpHeaders headers = new _HttpHeaders("1.1");
+  final HttpHeaders headers = new _HttpHeaders("1.1");
 
   HttpResponse({this.statusCode, this.reasonPhrase}) {
-    headers.add(HttpHeaders.SERVER, 'Spark');
+    headers.add(HttpHeaders.SERVER, 'Chrome Dev Editor');
   }
 
   HttpResponse.ok(): this(statusCode: HttpStatus.OK);
@@ -311,7 +322,8 @@ class HttpResponse {
    * based on the file extension.
    */
   void setContentTypeFrom(String path) {
-    headers.contentType = mime.lookupMimeType(path);
+    String type = mime.lookupMimeType(path);
+    headers.contentType = type != null ? type : 'application/octet-stream';
   }
 
   Future _send(tcp.TcpClient client) {

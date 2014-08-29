@@ -12,6 +12,8 @@
 library spark.preferences;
 
 import 'dart:async';
+import 'dart:convert';
+import 'dart:html';
 
 import 'package:chrome/chrome_app.dart' as chrome;
 import 'package:logging/logging.dart';
@@ -22,38 +24,106 @@ final Logger _logger = new Logger('preferences');
  * A PreferenceStore backed by `chome.storage.local`.
  */
 PreferenceStore localStore = new _ChromePreferenceStore(
-    chrome.storage.local, 'local', new Duration(seconds: 2));
+    chrome.storage.local, 'local', new Duration(milliseconds: 100));
 
 /**
  * A PreferenceStore backed by `chome.storage.sync`.
  */
 PreferenceStore syncStore = new _ChromePreferenceStore(
-    chrome.storage.sync, 'sync', new Duration(seconds: 6));
+    chrome.storage.sync, 'sync', new Duration(milliseconds: 100));
 
 /**
  * Preferences specific to Spark.
  */
 class SparkPreferences {
-  PreferenceStore prefStore;
+  final PreferenceStore prefsStore;
+
   Future onPreferencesReady;
+  JsonPreferencesStore _jsonStore;
 
-  // [CachedPreference] subclass instance for each preference:
-  BoolCachedPreference _stripWhitespaceOnSave;
+  // [JsonPreference] subclass instance for each preference:
+  JsonPreference<bool> stripWhitespaceOnSave;
+  JsonPreference<String> editorTheme;
+  JsonPreference<num> editorFontSize;
+  JsonPreference<String> keyBindings;
 
-  SparkPreferences(this.prefStore) {
+  JsonPreference<IndentationPreference> indentation;
+
+  SparkPreferences(this.prefsStore) {
+    _jsonStore = new JsonPreferencesStore(prefsStore);
     // Initialize each preference:
-    List<CachedPreference> allPreferences = [
-        _stripWhitespaceOnSave = new BoolCachedPreference(
-            prefStore, "stripWhitespaceOnSave"),
-        ];
+    stripWhitespaceOnSave = new JsonPreference<bool>(_jsonStore,
+        "stripWhitespaceOnSave");
+    editorTheme = new JsonPreference<String>(_jsonStore, "editorTheme");
+    editorFontSize = new JsonPreference<num>(_jsonStore, "editorFontSize");
+    keyBindings = new JsonPreference<String>(_jsonStore, "keyBindings");
 
-    onPreferencesReady = Future.wait(allPreferences.map((p) => p.whenLoaded));
+    onPreferencesReady = _jsonStore.whenLoaded;
+  }
+}
+
+class IndentationPreferences {
+  Map<String, IndentationPreference> preferences;
+
+  String toJson() => preferences.keys.fold("", (String prev, String key) =>
+      JSON.encode({prev:preferences[key].toJson()}));
+}
+
+class IndentationPreference {
+  bool useTabs;
+  int width;
+
+  IndentationPreferences() {}
+
+  String toJson() => JSON.encode({"useTabs":useTabs, "width":width});
+}
+
+class JsonPreferencesStore {
+  Map _defaultMap;
+  Map _userMap;
+
+  PreferenceStore _persistentStore;
+  Future whenLoaded;
+  bool _loaded = false;
+
+  // TODO: implement isDirty
+  bool get isDirty => null;
+
+  Stream<PreferenceEvent> get onPreferenceChange => _changeConroller.stream;
+  StreamController<PreferenceEvent> _changeConroller = new StreamController();
+
+  JsonPreferencesStore(this._persistentStore) {
+    whenLoaded = Future.wait([_loadDefaultPrefs(), _loadUserPrefs()]).then((_) =>
+        _loaded = true);
   }
 
-  // Getters and setters for the value of each preference:
-  bool get stripWhitespaceOnSave => _stripWhitespaceOnSave.value;
-  set stripWhitespaceOnSave(bool value) {
-    _stripWhitespaceOnSave.value = value;
+  Future _loadDefaultPrefs() {
+    return HttpRequest.getString(chrome.runtime.getURL('prefs.json'))
+        .then((String json) => _defaultMap = JSON.decode(json));
+  }
+
+  Future _loadUserPrefs() {
+    return _persistentStore.getValue("userJsonPrefs", "{}")
+        .then((String json) {
+      _userMap = JSON.decode(json);
+    });
+  }
+
+  dynamic getValue(String id, [dynamic defaultValue]) {
+    if (!_loaded) throw "JSON preferences are not finished loading";
+    return _userMap.containsKey(id) ? _userMap[id] : _defaultMap[id];
+  }
+
+  Future setValue(String id, dynamic value) {
+    _userMap[id] = value;
+    _changeConroller.add(new PreferenceEvent(_persistentStore, id, value.toString()));
+    String jsonString = JSON.encode(_userMap);
+    return _persistentStore.setValue("userJsonPrefs", jsonString);
+  }
+
+  Future removeValue(List<String> keys) {
+    keys.forEach((String key) => _userMap.remove(key));
+    return new Future.value();
   }
 }
 
@@ -62,71 +132,18 @@ class SparkPreferences {
  * getting and setting (automatically saving as well as caching) the preference
  * `value`.
  */
-abstract class CachedPreference<T> {
-  Future<CachedPreference> whenLoaded;
-
-  Completer _whenLoadedCompleter = new Completer<CachedPreference>();
-  final PreferenceStore _prefStore;
-  T _currentValue;
-  String _preferenceId;
+class JsonPreference<T> {
+  String _id;
+  JsonPreferencesStore _store;
 
   /**
-   * [prefStore] is the PreferenceStore to use and [preferenceId] is the id of
+   * [_prefsMap] is the Map of prefrence values to use and [_id] is the id of
    * the stored preference.
    */
-  CachedPreference(this._prefStore, this._preferenceId) {
-    whenLoaded = _whenLoadedCompleter.future;
-    _retrieveValue().then((_) {
-      // If already loaded (preference has been saved before the load has
-      // finished), don't complete.
-      if (!_whenLoadedCompleter.isCompleted) {
-        _whenLoadedCompleter.complete(this);
-      }
-    });
-  }
+  JsonPreference(this._store, this._id);
 
-  T adaptFromString(String value);
-  String adaptToString(T value);
-
-  /**
-   * The value of the preference, if loaded. If not loaded, throws an error.
-   */
-  T get value {
-    if (!_whenLoadedCompleter.isCompleted) {
-      throw "CachedPreference value read before it was loaded";
-    }
-    return _currentValue;
-  }
-
-  /**
-   * Sets and caches the value of the preference.
-   */
-  void set value(T newValue) {
-    _currentValue = newValue;
-    _prefStore.setValue(_preferenceId, adaptToString(newValue));
-
-    // If a load has not happened by this point, consider us loaded.
-    if (!_whenLoadedCompleter.isCompleted) {
-      _whenLoadedCompleter.complete(this);
-    }
-  }
-
-  Future _retrieveValue() => _prefStore.getValue(_preferenceId)
-      .then((String value) => _currentValue = adaptFromString(value));
-}
-
-/**
- * Defines a cached [bool] preference access object. Automatically saves and
- * caches for performance.
- */
-class BoolCachedPreference extends CachedPreference<bool> {
-  BoolCachedPreference(PreferenceStore prefs, String id) : super(prefs, id);
-
-  @override
-  bool adaptFromString(String value) => value == 'true';
-
-  @override
-  String adaptToString(bool value) => value ? 'true' : 'false';
+  T getValue() => _store.getValue(_id);
+  Future setValue(T newValue) => _store.setValue(_id, newValue);
 }
 
 /**
@@ -141,13 +158,13 @@ abstract class PreferenceStore {
   /**
    * Get the value for the given key. The value is returned as a [Future].
    */
-  Future<String> getValue(String key, [String defaultVal]);
+  Future<String> getValue(String key, [dynamic defaultVal]);
 
   /**
    * Set the value for the given key. The returned [Future] has the same value
    * as [value] on success.
    */
-  Future<String> setValue(String key, String value);
+  Future setValue(String key, dynamic value);
 
   /**
    * Removes list of items from this [PreferenceStore].
@@ -177,12 +194,12 @@ class MapPreferencesStore implements PreferenceStore {
 
   bool get isDirty => _dirty;
 
-  Future<String> getValue(String key, [String defaultVal]) {
+  Future getValue(String key, [String defaultVal]) {
     final String val = _map[key];
     return new Future.value(val != null ? val : defaultVal);
   }
 
-  Future<String> setValue(String key, String value) {
+  Future setValue(String key, String value) {
     _dirty = true;
     _map[key] = value;
     _controller.add(new PreferenceEvent(this, key, value));
@@ -243,7 +260,6 @@ class _ChromePreferenceStore implements PreferenceStore {
       return new Future.value(_map[key]);
     } else {
       return _storageArea.get(key).then((Map<String, String> map) {
-        // TODO(ussuri): Shouldn't we cache the just read value in _map?
         final String val = map == null ? null : map[key];
         return val != null ? val : defaultVal;
       });
@@ -254,16 +270,27 @@ class _ChromePreferenceStore implements PreferenceStore {
    * Removes list of items.
    */
   Future removeValue(List<String> keys) {
-    return _storageArea.remove(keys).then((Map<String, String> map) {
+    // Using a completer ensures the correct updating order: source of truth
+    // (_storageArea) first, cache (_map) second.
+    var completer = new Completer();
+    _storageArea.remove(keys).then((Map<String, String> map) {
       keys.forEach((key) => _map.remove(key));
+      completer.complete();
     });
+    return completer.future;
   }
 
   /**
    * Removes all preferences.
    */
   Future clear() {
-    return _storageArea.clear().then((_) => _map.clear());
+    // See comment in [removeValue].
+    var completer = new Completer();
+    _storageArea.clear().then((_) {
+      _map.clear();
+      completer.complete();
+    });
+    return completer.future;
   }
 
   /**
@@ -289,7 +316,7 @@ class _ChromePreferenceStore implements PreferenceStore {
   void flush() {
     if (_map.isNotEmpty) {
       _storageArea.set(_map);
-      _logger.info('saved preferences: ${_map.keys}');
+      _logger.info('flushed: ' + _map.toString());
       _map.clear();
     }
 

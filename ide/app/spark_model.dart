@@ -23,6 +23,8 @@ abstract class SparkModel extends Application {
     _instanceCreated = true;
   }
 
+  String get appVersion;
+
   AceManager get aceManager;
   ThemeManager get aceThemeManager;
   KeyBindingManager get aceKeysManager;
@@ -38,17 +40,16 @@ abstract class SparkModel extends Application {
   preferences.PreferenceStore get syncPrefs;
 
   void showSuccessMessage(String message);
-  void showErrorMessage(String title, String message);
+  void showErrorMessage(String title, {String message, Exception exception});
 
   void onSplitViewUpdate(int position);
   void setGitSettingsResetDoneVisible(bool visible);
+  Future showRootDirectory();
 
   /**
-   * Should filter files in the tree view and return the success of the
-   * operation, i.e. true if matches are found for [filter],
-   * or [filter] is null.
+   * Should filter files in the tree view.
    */
-  Future<bool> filterFilesList(String filter);
+  void filterFilesList(String filter);
 
   /**
    * Hide the splash screen; show the main UI.

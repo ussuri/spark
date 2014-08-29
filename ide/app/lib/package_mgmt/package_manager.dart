@@ -7,17 +7,26 @@ library spark.package_mgmt;
 import 'dart:async';
 
 import '../builder.dart';
+import '../jobs.dart';
 import '../workspace.dart';
 
 // TODO(ussuri): Add comments.
 
 abstract class PackageServiceProperties {
-  bool isProjectWithPackages(Container project) =>
+  bool isFolderWithPackages(Folder project) =>
       project.getChild(packageSpecFileName) != null;
 
   bool isPackageResource(Resource resource) {
     return (resource is File && resource.name == packageSpecFileName) ||
-           (resource is Container && isProjectWithPackages(resource));
+           (resource is Folder && isFolderWithPackages(resource)) ||
+           _isPackagesFolder(resource) ||
+           _isPackagesFolder(resource.parent);
+  }
+
+  bool _isPackagesFolder(Resource resource) {
+    return resource is Folder &&
+           resource.name == packagesDirName &&
+           isFolderWithPackages(resource.parent);
   }
 
   bool isInPackagesFolder(Resource resource) {
@@ -68,8 +77,14 @@ abstract class PackageManager {
   PackageBuilder getBuilder();
   PackageResolver getResolverFor(Project project);
 
-  Future installPackages(Container container);
-  Future upgradePackages(Container container);
+  Future installPackages(Folder container, ProgressMonitor monitor);
+  Future upgradePackages(Folder container, ProgressMonitor monitor);
+
+  /**
+   * Return `true` or `null` if all packages are installed. Otherwise, return a
+   * `String` with the name of an uninstalled package.
+   */
+  Future<dynamic> arePackagesInstalled(Folder container);
 }
 
 abstract class PackageResolver {
@@ -89,4 +104,6 @@ abstract class PackageBuilder extends Builder {
   //
 
   PackageServiceProperties get properties;
+
+  Future build(ResourceChangeEvent event, ProgressMonitor monitor);
 }

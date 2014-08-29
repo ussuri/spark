@@ -81,7 +81,7 @@ void fillContextMenu(UListElement ul,
  * The ActionManager class is used to manage a set of actions.
  */
 class ActionManager {
-  Map<String, Action> _actionMap = {};
+  final Map<String, Action> _actionMap = {};
 
   /**
    * Register this [ActionManager] as a key event listener for the global
@@ -198,15 +198,16 @@ class KeyBinding {
           "SPACE": KeyCode.SPACE,
           "ENTER": KeyCode.ENTER,
           "TAB": KeyCode.TAB,
-          "[" : KeyCode.OPEN_SQUARE_BRACKET,
-          "]" : KeyCode.CLOSE_SQUARE_BRACKET,
-          ".": KeyCode.PERIOD
+          "[": KeyCode.OPEN_SQUARE_BRACKET,
+          "]": KeyCode.CLOSE_SQUARE_BRACKET,
+          ".": KeyCode.PERIOD,
+          ",": KeyCode.COMMA
       };
     }
     return __bindingMap;
   }
 
-  Set<int> modifiers = new Set();
+  final Set<int> modifiers = new Set();
   int keyCode;
 
   /**
@@ -288,6 +289,11 @@ class KeyBinding {
   int _codeFor(String str) {
     if (_bindingMap[str] != null) {
       return _bindingMap[str];
+    }
+
+    // Look for specific hex key codes.
+    if (str.startsWith('0x')) {
+     return int.parse(str.substring(2), radix: 16);
     }
 
     return str.codeUnitAt(0);

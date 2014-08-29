@@ -10,43 +10,49 @@
 <link rel="import" href="../../../packages/spark_widgets/spark_toolbar/spark_toolbar.html">
 
 <polymer-element name="spark-dialog" extends="spark-widget"
-    attributes="title animation">
+    attributes="headerTitle noClosingX animation">
   <template>
     <link rel="stylesheet" href="spark_dialog.css">
 
     <spark-modal id="modal" focused animation="{{animation}}">
-      <spark-toolbar id="header" 
-          horizontal 
+      <spark-toolbar id="header"
+          horizontal
           justify="edges"
           spacing="small">
-        <span id="title">{{title}}</span>
-        <spark-button id="closingX" 
-            flat
-            round
-            padding="small"
-            overlayToggle>
-          <svg id="closingXGlyph" viewBox="0 0 24 24">
-            <polygon points="19,6.4 17.6,5 12,10.6 6.4,5 5,6.4 10.6,12 5,17.6 6.4,19 12,13.4 17.6,19 19,17.6 13.4,12 "></polygon>
-          </svg>
-        </spark-button>
+        <span id="headerTitle">{{headerTitle}}</span>
+        <template if="{{!noClosingX}}">
+          <spark-button id="closingX"
+              flat
+              round
+              padding="small"
+              overlayToggle>
+            <svg id="closingXGlyph" width="24px" height="24px" viewBox="0 0 24 24">
+              <path d="M17.369 8.037l-1.037-1.037-4.148 4.148-4.148-4.148-1.037 1.037 4.148 4.148-4.148 4.148 1.037 1.037 4.148-4.148 4.148 4.148 1.037-1.037-4.148-4.148 4.148-4.148z"/>
+            </svg>
+          </spark-button>
+        </template>
       </spark-toolbar>
 
-      <div id="body">
-        <content select="div,span,label,input,p,h4,spark-progress,template"></content>
+      <form id="body">
+        <content id="bodyContent"
+           select="div,span,label,input,p,h4,spark-progress,template">
+        </content>
         <!-- TODO(ussuri): remove the line above and uncomment the line below
              once the fix for :not() makes it to Chrome 36 stable
              (it's in canary as of 05/29/2014). BUG #2183. -->
         <!--content select=":not(spark-dialog-button)"></content-->
-      </div>
+      </form>
 
-      <spark-toolbar id="footer" 
-          horizontal 
-          justify="right" 
-          spacing="medium">
-        <content select="spark-dialog-button"></content>
+      <spark-toolbar id="footer"
+          horizontal
+          justify="right"
+          spacing="small"
+          collapseEmpty>
+        <div id="progress"></div>
+        <content id="buttonsContent" select="spark-dialog-button"></content>
       </spark-toolbar>
     </spark-modal>
   </template>
 
-  <script type="application/dart;component=1" src="spark_dialog.dart"></script>
+  <script type="application/dart" src="spark_dialog.dart"></script>
 </polymer-element>

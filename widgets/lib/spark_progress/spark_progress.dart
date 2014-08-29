@@ -68,12 +68,15 @@ class SparkProgress extends SparkWidget {
   SparkProgress.created() : super.created();
 
   @override
-  void enteredView() {
+  void attached() {
+    super.attached();
+
     _progressDiv = $['progressDiv'];
 
     // TODO(ussuri): Investigate why this explicit assignment is necessary.
     visible = visible;
     indeterminate = indeterminate;
+    indeterminateChanged();
   }
 
   Stream get onCancelled => on['cancelled'];

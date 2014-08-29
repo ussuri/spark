@@ -12,6 +12,7 @@
   border: none;
   overflow: hidden;
   cursor: pointer;
+  width: 100%;
 }
 
 ::content * {
@@ -23,15 +24,25 @@
   color: #000;
 }
 
+#main {
+  position: relative;
+  width: 100%;
+}
+
 #description {
   color: #bdbdbd;
   justify-content: flex-end;
 }
 
-:host(.active, .selected) #label,
-:host(.active, .selected) #description,
-:host(.active, .selected) ::content * {
-  color: white;
+#checkmark {
+  display: none;
+  position: absolute;
+  right: 0px;
+  top: -3px;
+}
+
+:host([checkmark="true"]) #checkmark {
+  display: block;
 }
 
 :host(.selected) {
@@ -39,6 +50,5 @@
 }
 
 :host(.active) {
-  background-color: rgba(66, 129, 244, 1.0);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  background: #e4e4e4;
 }

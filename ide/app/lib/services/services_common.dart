@@ -6,10 +6,13 @@ library spark.services_common;
 
 import 'dart:async';
 
+import 'package:logging/logging.dart';
+
 import '../workspace.dart';
 import '../package_mgmt/package_manager.dart';
 import '../package_mgmt/pub.dart';
-import '../package_mgmt/pub_properties.dart';
+
+final Logger _logger = new Logger('spark.services_common');
 
 /**
  * Defines a received action event.
@@ -157,7 +160,11 @@ class CompileResult {
     // Find all files.
     problems.forEach((CompileError error) {
       error.file = resolver.getResource(error._uri);
-      if (error.file != null) retriever.addFile(error.file);
+      if (error.file != null) {
+        retriever.addFile(error.file);
+      } else {
+        _logger.warning('no file associated with ${error}');
+      }
     });
 
     // Get content.
@@ -177,6 +184,16 @@ class CompileResult {
 
   /// This is true if none of the reported problems were errors.
   bool getSuccess() => !_problems.any((p) => p.isError);
+
+  String toString() {
+    if (getSuccess()) {
+      return 'compile successful';
+    } else if (problems.length == 1) {
+      return problems.first.toString();
+    } else {
+      return problems.join('\n');
+    }
+  }
 }
 
 /**
@@ -226,6 +243,8 @@ abstract class UuidResolver {
  * Defines an object containing information about a declaration.
  */
 abstract class Declaration {
+  static final Declaration EMPTY_DECLARATION = new _EmptyDeclaration();
+
   final String name;
 
   Declaration(this.name);
@@ -247,6 +266,16 @@ abstract class Declaration {
       "name": name,
     };
   }
+}
+
+class _EmptyDeclaration extends Declaration {
+  _EmptyDeclaration() : super('');
+}
+
+class FileDeclaration extends Declaration {
+  final File file;
+
+  FileDeclaration(File file) : this.file = file, super(file.name);
 }
 
 /**
@@ -382,6 +411,10 @@ abstract class OutlineTopLevelEntry extends OutlineEntry {
       entry = new OutlineTopLevelFunction()..populateFromMap(mapData);
     } else if (type == OutlineTopLevelVariable._type) {
       entry = new OutlineTopLevelVariable()..populateFromMap(mapData);
+    } else if (type == OutlineTopLevelAccessor._type) {
+      entry = new OutlineTopLevelAccessor()..populateFromMap(mapData);
+    } else if (type == OutlineTypeDef._type) {
+      entry = new OutlineTypeDef()..populateFromMap(mapData);
     }
 
     entry.populateFromMap(mapData);
@@ -389,6 +422,17 @@ abstract class OutlineTopLevelEntry extends OutlineEntry {
   }
 
   Map toMap() => super.toMap();
+}
+
+/**
+ * Defines a TypeDef entry in the [Outline].
+ */
+class OutlineTypeDef extends OutlineTopLevelEntry {
+  static String _type = "typedef";
+
+  OutlineTypeDef([String name]) : super(name);
+
+  Map toMap() => super.toMap()..addAll({"type": _type});
 }
 
 /**
@@ -438,8 +482,8 @@ abstract class OutlineMember extends OutlineEntry {
       entry = new OutlineMethod()..populateFromMap(mapData);
     } else if (type == OutlineProperty._type) {
       entry = new OutlineProperty()..populateFromMap(mapData);
-    } else if (type == OutlineAccessor._type) {
-      entry = new OutlineAccessor()..populateFromMap(mapData);
+    } else if (type == OutlineClassAccessor._type) {
+      entry = new OutlineClassAccessor()..populateFromMap(mapData);
     }
 
     return entry;
@@ -509,13 +553,13 @@ class OutlineProperty extends OutlineMember {
 /**
  * Defines a class accessor (getter / setter) entry in an [OutlineClass].
  */
-class OutlineAccessor extends OutlineMember {
+class OutlineClassAccessor extends OutlineMember {
   static String _type = "class-accessor";
 
   String returnType;
   bool setter;
 
-  OutlineAccessor([String name, this.returnType, this.setter = false]) :
+  OutlineClassAccessor([String name, this.returnType, this.setter = false]) :
       super(name);
 
   /**
@@ -555,6 +599,36 @@ class OutlineTopLevelFunction extends OutlineTopLevelEntry {
     Map m = super.toMap();
     m['type'] = _type;
     if (returnType != null) m['returnType'] = returnType;
+    return m;
+  }
+}
+
+/**
+ * Defines a top-level accessor (getter / setter) entry in an [Outline].
+ */
+class OutlineTopLevelAccessor extends OutlineTopLevelEntry {
+  static String _type = "top-accessor";
+
+  String returnType;
+  bool setter;
+
+  OutlineTopLevelAccessor([String name, this.returnType, this.setter = false]) :
+      super(name);
+
+  /**
+   * Populates values and children from a map
+   */
+  void populateFromMap(Map mapData) {
+    super.populateFromMap(mapData);
+    returnType = mapData["returnType"];
+    setter = mapData["setter"];
+  }
+
+  Map toMap() {
+    Map m = super.toMap();
+    m['type'] = _type;
+    if (returnType != null) m['returnType'] = returnType;
+    m['setter'] = setter;
     return m;
   }
 }

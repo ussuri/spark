@@ -7,10 +7,15 @@ library git.commands.merge;
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'checkout.dart';
+import 'commit.dart';
 import '../diff3.dart';
+import '../exception.dart';
+import '../file_operations.dart';
 import '../object.dart';
 import '../object_utils.dart';
 import '../objectstore.dart';
+import '../options.dart';
 import '../utils.dart';
 
 class MergeItem {
@@ -21,13 +26,6 @@ class MergeItem {
   bool isConflict;
 
   MergeItem(this.ours, this.base, this.theirs, [this.isConflict = false]);
-}
-
-class TreeDiffResult {
-  List<TreeEntry> adds;
-  List<TreeEntry> removes;
-  List merges;
-  TreeDiffResult(this.adds, this.removes, this.merges);
 }
 
 /**
@@ -46,62 +44,10 @@ class Merge {
     return new Uint8List(0);
   }
 
-  static TreeDiffResult diffTree(TreeObject oldTree, TreeObject newTree) {
-    oldTree.sortEntries();
-    newTree.sortEntries();
-
-    List<TreeEntry> oldEntries = oldTree.entries;
-    List<TreeEntry> newEntries = newTree.entries;
-
-    int oldIdx = 0;
-    int newIdx = 0;
-
-    List removes = [];
-    List adds = [];
-    List merges = [];
-
-    while (true) {
-      TreeEntry newEntry = newIdx < newEntries.length ? newEntries[newIdx]
-          : null;
-      TreeEntry oldEntry = oldIdx < oldEntries.length ? oldEntries[oldIdx]
-          : null;
-
-      if (newEntry == null) {
-        if (oldEntry == null ) {
-          break;
-        }
-        removes.add(oldEntry);
-        oldIdx++;
-      } else if (oldEntry == null) {
-        adds.add(newEntry);
-        newIdx++;
-      } else if (newEntry.name.compareTo(oldEntry.name) < 0) {
-        adds.add(newEntry);
-        newIdx++;
-      } else if (newEntry.name.compareTo(oldEntry.name) > 0) {
-        removes.add(oldEntry);
-        oldIdx++;
-      } else {
-        if (newEntry.sha != oldEntry.sha) {
-          if (newEntry.isBlob != oldEntry.isBlob) {
-            removes.add(oldEntry);
-            adds.add(newEntry);
-          } else {
-            merges.add({'new': newEntry, 'old':oldEntry});
-          }
-        }
-        oldIdx++;
-        newIdx++;
-      }
-    }
-    return new TreeDiffResult(adds, removes, merges);
-  }
-
   static Future<String> mergeTrees(ObjectStore store, TreeObject ourTree,
       TreeObject baseTree, TreeObject theirTree) {
     List<TreeEntry> finalTree = [];
     List merges = [];
-    var next = null;
     List indices = [0,0,0];
     List<MergeItem> conflicts = [];
 
@@ -142,7 +88,8 @@ class Merge {
           if (theirEntry.name == next.name) {
             if (!shasEqual(theirEntry.shaBytes, next.shaBytes)) {
               if (baseEntry.name != next.name) {
-                baseEntry = new TreeEntry(null, null, false);
+                // The file does not exist in the  baseEntry. Create a dummy entry.
+                baseEntry = TreeEntry.dummyEntry(false);
                 if (next.isBlob) {
                   conflicts.add( new MergeItem(next, null, theirEntry, true));
                   break;
@@ -199,7 +146,7 @@ class Merge {
     }
 
     if (conflicts.length > 0) {
-      // TODO deal with conflicts.
+      // TODO(grv): Deal with conflicts.
       throw "unable to merge. Conflicts.";
     }
 
@@ -243,6 +190,93 @@ class Merge {
       } else {
         return new Future.error(conflicts);
       }
+    });
+  }
+
+  /**
+   * Identify if the given branch is a local or remote branch and return the
+   * headSha value. This will not do an automatic fetch thus return the local
+   * headSha of the remote branch.
+   */
+  static Future<String> _getSourceBranchSha(ObjectStore store,
+      String sourceBranchName) {
+    if (sourceBranchName.startsWith('origin/')) {
+      sourceBranchName = sourceBranchName.split('/').last;
+      return store.getRemoteHeadForRef(sourceBranchName);
+    } else {
+      String refName = 'refs/heads/${sourceBranchName}';
+      return store.getHeadForRef(refName);
+    }
+  }
+
+  static Future merge(GitOptions options, String sourceBranchName) {
+    ObjectStore store = options.store;
+    return store.getHeadRef().then((headRefName) {
+      return store.getHeadForRef(headRefName).then((localSha) {
+        return _getSourceBranchSha(store, sourceBranchName).then(
+            (String sourceSha) {
+          if (localSha == sourceSha) {
+            return new Future.error(
+              new GitException(GitErrorConstants.GIT_BRANCH_UP_TO_DATE));
+          }
+
+          return store.getCommonAncestor([sourceSha, localSha]).then((commonSha) {
+            if (commonSha == sourceSha) {
+              return new Future.error(
+                  new GitException(GitErrorConstants.GIT_BRANCH_UP_TO_DATE));
+            } else if (commonSha == localSha) {
+              // The current branch has not diverged and the branch to be merged
+              // is already ahead. Move the local head to the new branch.
+              return Checkout.checkout(options, sourceSha).then((_) {
+                return FileOps.createFileWithContent(options.root,
+                    '.git/${headRefName}', sourceSha + '\n', 'Text').then((_) {
+                  return store.writeConfig().then((_) => sourceSha);
+                });
+              });
+            } else {
+              String commitMsg =
+                  "Merge branch ${options.branchName} into ${sourceBranchName}";
+              return _merge(options, localSha, sourceSha, commonSha, commitMsg);
+            }
+          });
+        });
+      });
+    });
+  }
+
+  static Future _merge(GitOptions options,
+                String localSha,
+                String sourceSha,
+                String commonSha,
+                String commitMsg) {
+
+    ObjectStore store = options.store;
+    List shas = [localSha, commonSha, sourceSha];
+    return store.getHeadRef().then((String headRefName) {
+      return store.getTreesFromCommits(shas).then((trees) {
+        return Merge.mergeTrees(store, trees[0], trees[1], trees[2]).then(
+            (String finalTreeSha) {
+
+          return store.getCurrentBranch().then((branch) {
+            options.branchName = branch;
+            options.commitMessage = commitMsg;
+            // Create a merge commit by default.
+
+            return Commit.createCommit(options, [sourceSha, localSha], finalTreeSha,
+                headRefName).then((commitSha) {
+              return Checkout.checkout(options, commitSha).then((_) {
+                return FileOps.createFileWithContent(options.root,
+                    '.git/${headRefName}', commitSha + '\n', 'Text').then((_) {
+                  return store.writeConfig().then((_) => commitSha);
+                });
+              });
+            });
+          });
+        }).catchError((e) {
+          return new Future.error(
+              new GitException(GitErrorConstants.GIT_MERGE_ERROR));
+        });
+      });
     });
   }
 }

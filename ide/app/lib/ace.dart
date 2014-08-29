@@ -15,22 +15,22 @@ import 'dart:math' as math;
 import 'package:ace/ace.dart' as ace;
 import 'package:ace/proxy.dart';
 import 'package:crypto/crypto.dart' as crypto;
-import 'package:path/path.dart' as path;
 
-import '../spark_flags.dart';
 import 'css/cssbeautify.dart';
 import 'editors.dart';
 import 'markdown.dart';
 import 'navigation.dart';
 import 'package_mgmt/bower_properties.dart';
-import 'package_mgmt/pub_properties.dart';
+import 'package_mgmt/pub.dart';
 import 'platform_info.dart';
 import 'preferences.dart';
 import 'utils.dart' as utils;
 import 'workspace.dart' as workspace;
+import 'workspace_utils.dart';
 import 'services.dart' as svc;
+import 'spark_flags.dart';
 import 'outline.dart';
-import 'ui/polymer/goto_line_view/goto_line_view.dart';
+import 'ui/goto_line_view/goto_line_view.dart';
 import 'utils.dart';
 
 export 'package:ace/ace.dart' show EditSession;
@@ -42,9 +42,9 @@ class TextEditor extends Editor {
   final workspace.File file;
 
   StreamSubscription _aceSubscription;
-  StreamController _dirtyController = new StreamController.broadcast();
-  StreamController _modificationController = new StreamController.broadcast();
-  Completer<Editor> _whenReadyCompleter = new Completer();
+  final StreamController _dirtyController = new StreamController.broadcast();
+  final StreamController _modificationController = new StreamController.broadcast();
+  final Completer<Editor> _whenReadyCompleter = new Completer();
 
   final SparkPreferences _prefs;
   ace.EditSession _session;
@@ -64,6 +64,18 @@ class TextEditor extends Editor {
     if (MarkdownEditor.isMarkdownFile(file)) {
       return new MarkdownEditor._create(aceManager, file, prefs);
     }
+    if (HtmlEditor.isHtmlFile(file)) {
+      return new HtmlEditor._create(aceManager, file, prefs);
+    }
+    if (YamlEditor.isYamlFile(file)) {
+      return new YamlEditor._create(aceManager, file, prefs);
+    }
+    if (GoEditor.isGoFile(file)) {
+      return new GoEditor._create(aceManager, file, prefs);
+    }
+    if (JsonEditor.isJsonFile(file)) {
+      return new JsonEditor._create(aceManager, file, prefs);
+    }
     return new TextEditor._create(aceManager, file, prefs);
   }
 
@@ -73,6 +85,9 @@ class TextEditor extends Editor {
 
   void setSession(ace.EditSession value) {
     _session = value;
+
+    customizeSession(_session);
+
     if (_aceSubscription != null) _aceSubscription.cancel();
     _aceSubscription = _session.onChange.listen((_) => dirty = true);
     if (!_whenReadyCompleter.isCompleted) _whenReadyCompleter.complete(this);
@@ -96,7 +111,7 @@ class TextEditor extends Editor {
   html.Element get element => aceManager.parentElement;
 
   void activate() {
-    aceManager.outline.visible = supportsOutline;
+    _outline.visible = supportsOutline;
     aceManager._aceEditor.readOnly = readOnly;
   }
 
@@ -105,7 +120,11 @@ class TextEditor extends Editor {
    */
   void reconcile() { }
 
-  void deactivate() { }
+  void deactivate() {
+    if (supportsOutline && _outline.visible) {
+      _outline.visible = false;
+    }
+  }
 
   void resize() => aceManager.resize();
 
@@ -120,6 +139,7 @@ class TextEditor extends Editor {
         selection.offset + selection.length);
 
     aceManager._aceEditor.gotoLine(startSelection.row);
+    aceManager._aceEditor.scrollToLine(startSelection.row, center: true);
 
     ace.Selection aceSel = aceManager._aceEditor.selection;
     aceSel.setSelectionAnchor(startSelection.row, startSelection.column);
@@ -136,7 +156,11 @@ class TextEditor extends Editor {
 
   void format() { }
 
-  Future navigateToDeclaration([Duration timeLimit]) => new Future.value();
+  /**
+   * Jump to the declaration of the symbol currently under the cursor.
+   */
+  Future<svc.Declaration> navigateToDeclaration([Duration timeLimit]) =>
+      new Future.value(svc.Declaration.EMPTY_DECLARATION);
 
   void fileContentsChanged() {
     if (_session != null) {
@@ -160,7 +184,7 @@ class TextEditor extends Editor {
       String text = _session.value;
 
       // Remove the trailing whitespace if asked to do so.
-      if (_prefs.stripWhitespaceOnSave) {
+      if (_prefs.stripWhitespaceOnSave.getValue()) {
         text = text.replaceAll(whitespaceRegEx, '');
       }
 
@@ -173,6 +197,15 @@ class TextEditor extends Editor {
     } else {
       return new Future.value();
     }
+  }
+
+  int getCursorOffset() => _session.document.positionToIndex(
+      aceManager._aceEditor.cursorPosition);
+
+  void customizeSession(ace.EditSession session) {
+    // By default, all file types use 2-space soft tabs for indentation.
+    session.tabSize = 2;
+    session.useSoftTabs = true;
   }
 
   /**
@@ -204,15 +237,46 @@ class TextEditor extends Editor {
   void _invokeReconcile() {
     reconcile();
   }
+
+  Outline get _outline => aceManager.outline;
+
+  /**
+   * Handle navigating to file references in strings. So, things like:
+   *
+   *     @import url("packages/bootjack/css/bootstrap.min.css");
+   */
+  Future<svc.Declaration> _simpleNavigateToDeclaration([Duration timeLimit]) {
+    if (file.parent == null) {
+      return new Future.value(svc.Declaration.EMPTY_DECLARATION);
+    }
+
+    String path = _getQuotedString(_session.value, getCursorOffset());
+    if (path == null) return new Future.value(svc.Declaration.EMPTY_DECLARATION);
+
+    workspace.File targetFile = resolvePath(file, path);
+
+    if (targetFile != null) {
+      aceManager.delegate.openEditor(targetFile);
+      return new Future.value(new svc.FileDeclaration(targetFile));
+    } else {
+      return new Future.value();
+    }
+  }
 }
 
 class DartEditor extends TextEditor {
   static bool isDartFile(workspace.File file) => file.name.endsWith('.dart');
 
-  int outlineScrollPosition = 0;
+  OffsetRange outlineScrollPosition = new OffsetRange();
 
-  DartEditor._create(AceManager aceManager, workspace.File file,
-      SparkPreferences prefs) : super._create(aceManager, file, prefs);
+  DartEditor._create(AceManager aceManager, workspace.File file, SparkPreferences prefs) :
+      super._create(aceManager, file, prefs);
+
+  void customizeSession(ace.EditSession session) {
+    // Dart files use 2-space soft tabs for indentation.
+    session.tabSize = 2;
+    session.useSoftTabs = true;
+  }
 
   bool get supportsOutline => true;
 
@@ -220,11 +284,14 @@ class DartEditor extends TextEditor {
   void activate() {
     super.activate();
 
-    if (_session != null) {
-      _outline.build(file.name, _session.value);
-    }
+    // Outline will be built in reconcile().
+    //_outline.build(file.name, _session.value);
 
     _outline.scrollPosition = outlineScrollPosition;
+
+    if (file.project != null) {
+      aceManager._analysisService.getCreateProjectAnalyzer(file.project);
+    }
   }
 
   @override
@@ -235,24 +302,22 @@ class DartEditor extends TextEditor {
   }
 
   void reconcile() {
-    int pos = _outline.scrollPosition;
+    OffsetRange pos = _outline.scrollPosition;
     _outline.build(file.name, _session.value).then((_) {
       _outline.scrollPosition = pos;
     });
   }
 
-  Outline get _outline => aceManager.outline;
-
   Future<svc.Declaration> navigateToDeclaration([Duration timeLimit]) {
-    int offset = _session.document.positionToIndex(
-        aceManager._aceEditor.cursorPosition);
+    int offset = getCursorOffset();
 
     Future declarationFuture = aceManager._analysisService.getDeclarationFor(
         file, offset);
 
     if (timeLimit != null) {
-      declarationFuture = declarationFuture.timeout(timeLimit, onTimeout: () =>
-          throw new TimeoutException("navigateToDeclaration timed out"));
+      declarationFuture = declarationFuture.timeout(timeLimit, onTimeout: () {
+        throw new TimeoutException("navigateToDeclaration timed out");
+      });
     }
 
     return declarationFuture.then((svc.Declaration declaration) {
@@ -277,8 +342,8 @@ class DartEditor extends TextEditor {
 class CssEditor extends TextEditor {
   static bool isCssFile(workspace.File file) => file.name.endsWith('.css');
 
-  CssEditor._create(AceManager aceManager, workspace.File file,
-    SparkPreferences prefs) : super._create(aceManager, file, prefs);
+  CssEditor._create(AceManager aceManager, workspace.File file, SparkPreferences prefs) :
+      super._create(aceManager, file, prefs);
 
   bool get supportsFormat => true;
 
@@ -290,17 +355,21 @@ class CssEditor extends TextEditor {
       dirty = true;
     }
   }
+
+  Future<svc.Declaration> navigateToDeclaration([Duration timeLimit]) =>
+      _simpleNavigateToDeclaration(timeLimit);
 }
 
 class MarkdownEditor extends TextEditor {
-  static bool isMarkdownFile(workspace.File file) => file.name.toLowerCase()
-      .endsWith('.md');
+  static bool isMarkdownFile(workspace.File file) =>
+      file.name.toLowerCase().endsWith('.md');
 
   Markdown _markdown;
-  StreamSubscription _markdownOnDirtySubscription;
-  MarkdownEditor._create(AceManager aceManager, workspace.File file,
-    SparkPreferences prefs) : super._create(aceManager, file, prefs) {
-       _markdown = new Markdown(element, file);
+
+  MarkdownEditor._create(AceManager aceManager, workspace.File file, SparkPreferences prefs) :
+      super._create(aceManager, file, prefs) {
+    // Parent this at the tab container level.
+    _markdown = new Markdown(element.parent.parent, file);
   }
 
   @override
@@ -321,24 +390,86 @@ class MarkdownEditor extends TextEditor {
   }
 }
 
+class HtmlEditor extends TextEditor {
+  static bool isHtmlFile(workspace.File file) => isHtmlFilename(file.name);
+
+  HtmlEditor._create(AceManager aceManager, workspace.File file, SparkPreferences prefs) :
+      super._create(aceManager, file, prefs);
+
+  Future<svc.Declaration> navigateToDeclaration([Duration timeLimit]) =>
+      _simpleNavigateToDeclaration(timeLimit);
+}
+
+class JsonEditor extends TextEditor {
+  static bool isJsonFile(workspace.File file) => file.name.endsWith('.json');
+
+  JsonEditor._create(AceManager aceManager, workspace.File file, SparkPreferences prefs) :
+      super._create(aceManager, file, prefs);
+
+  Future<svc.Declaration> navigateToDeclaration([Duration timeLimit]) =>
+      _simpleNavigateToDeclaration(timeLimit);
+}
+
+/**
+ * An editor for `.go` files. Go's convention is to use hard tabs for
+ * indentation.
+ */
+class GoEditor extends TextEditor {
+  static bool isGoFile(workspace.File file) => file.name.endsWith('.go');
+
+  GoEditor._create(AceManager aceManager, workspace.File file,
+      SparkPreferences prefs) : super._create(aceManager, file, prefs);
+
+  void customizeSession(ace.EditSession session) {
+    super.customizeSession(session);
+
+    // Go files use hard tabs for indentation.
+    session.useSoftTabs = false;
+
+    // The number of spaces to use is not specified by Go.
+    session.tabSize = 4;
+  }
+}
+
+/**
+ * An editor for `.yaml` files. The yaml format does not accept tabs.
+ */
+class YamlEditor extends TextEditor {
+  static bool isYamlFile(workspace.File file) => file.name.endsWith('.yaml');
+
+  YamlEditor._create(AceManager aceManager, workspace.File file,
+      SparkPreferences prefs) : super._create(aceManager, file, prefs);
+
+  void customizeSession(ace.EditSession session) {
+    // Yaml files use 2-space soft tabs for indentation.
+    session.tabSize = 2;
+
+    // Hard tabs are not supported.
+    session.useSoftTabs = true;
+  }
+}
+
 /**
  * A wrapper around an Ace editor instance.
  */
 class AceManager {
   static final KEY_BINDINGS = ace.KeyboardHandler.BINDINGS;
+
   /**
    * The container for the Ace editor.
    */
   final html.Element parentElement;
   final AceManagerDelegate delegate;
+  final SparkPreferences _prefs;
 
   Outline outline;
 
-  StreamController _onGotoDeclarationController = new StreamController();
+  final StreamController _onGotoDeclarationController = new StreamController();
   Stream get onGotoDeclaration => _onGotoDeclarationController.stream;
   GotoLineView gotoLineView;
 
   ace.Editor _aceEditor;
+  ace.EditSession _currentSession;
 
   workspace.Marker _currentMarker;
 
@@ -350,25 +481,61 @@ class AceManager {
   workspace.File currentFile;
   svc.AnalyzerService _analysisService;
 
+  ace.EditSession _markerSession = null;
+  int _linkingMarkerId;
+
   AceManager(this.parentElement,
              this.delegate,
              svc.Services services,
-             PreferenceStore prefs) {
+             this._prefs) {
     ace.implementation = ACE_PROXY_IMPLEMENTATION;
     _aceEditor = ace.edit(parentElement);
     _aceEditor.renderer.fixedWidthGutter = true;
     _aceEditor.highlightActiveLine = false;
     _aceEditor.printMarginColumn = 80;
     _aceEditor.readOnly = true;
-    _aceEditor.fadeFoldWidgets = true;
+    // TODO(devoncarew): Commented out - see #2475.
+    //_aceEditor.fadeFoldWidgets = true;
 
     _analysisService =  services.getService("analyzer");
 
     // Enable code completion.
     ace.require('ace/ext/language_tools');
     _aceEditor.setOption('enableBasicAutocompletion', true);
-    _aceEditor.setOption('enableSnippets', true);
-    _aceEditor.setOption('enableMultiselect', false);
+    // TODO(devoncarew): Disabled to workaround #2442.
+    //_aceEditor.setOption('enableSnippets', true);
+
+    ace.require('ace/ext/linking');
+    _aceEditor.setOptions({'enableMultiselect': false,
+                           'enableLinking': true});
+
+    _aceEditor.onLinkHover.listen((ace.LinkEvent event) {
+      if (currentFile == null) return;
+      if (!DartEditor.isDartFile(currentFile)) return;
+
+      ace.Token token = event.token;
+
+      if (token != null && token.type == "identifier") {
+        int startColumn = event.token.start;
+        ace.Point startPosition =
+            new ace.Point(event.position.row, startColumn);
+        int endColumn = startColumn + event.token.value.length;
+        ace.Point endPosition = new ace.Point(event.position.row, endColumn);
+        ace.Range markerRange =
+            new ace.Range.fromPoints(startPosition, endPosition);
+        _setLinkingMarker(markerRange);
+      } else {
+        _setLinkingMarker(null);
+      }
+    });
+
+    parentElement.onKeyUp.listen((event) {
+      if ((PlatformInfo.isMac && event.keyCode == html.KeyCode.META) ||
+          (!PlatformInfo.isMac && event.keyCode == html.KeyCode.CTRL)) {
+        _setLinkingMarker(null);
+      }
+    });
+
 
     // Override Ace's `gotoline` command.
     var command = new ace.Command(
@@ -376,6 +543,7 @@ class AceManager {
         const ace.BindKey(mac: 'Command-L', win: 'Ctrl-L'),
         _showGotoLineView);
     _aceEditor.commands.addCommand(command);
+
     if (PlatformInfo.isMac) {
       command = new ace.Command(
           'scrolltobeginningofdocument',
@@ -390,26 +558,47 @@ class AceManager {
       _aceEditor.commands.addCommand(command);
     }
 
+    // Remove the `ctrl-,` binding.
+    _aceEditor.commands.removeCommand('showSettingsMenu');
+
     // Add some additional file extension editors.
     ace.Mode.extensionMap['classpath'] = ace.Mode.XML;
-    ace.Mode.extensionMap['cmd'] = ace.Mode.BATCHFILE;
-    ace.Mode.extensionMap['diff'] = ace.Mode.DIFF;
+    ace.Mode.extensionMap['gyp'] = ace.Mode.PYTHON;
+    ace.Mode.extensionMap['gypi'] = ace.Mode.PYTHON;
+    ace.Mode.extensionMap['idl'] = ace.Mode.C_CPP;
     ace.Mode.extensionMap['lock'] = ace.Mode.YAML;
+    ace.Mode.extensionMap['nmf'] = ace.Mode.JSON;
     ace.Mode.extensionMap['project'] = ace.Mode.XML;
+    ace.Mode.extensionMap['webapp'] = ace.Mode.JSON;
+    ace.Mode.extensionMap['gsp'] = ace.Mode.HTML;
+    ace.Mode.extensionMap['jsp'] = ace.Mode.HTML;
+    // The extensions used in Spark's own internal templates.
+    ace.Mode.extensionMap['html_'] = ace.Mode.HTML;
+    ace.Mode.extensionMap['css_'] = ace.Mode.CSS;
+    ace.Mode.extensionMap['js_'] = ace.Mode.JAVASCRIPT;
+    ace.Mode.extensionMap['dart_'] = ace.Mode.DART;
+    ace.Mode.extensionMap['json_'] = ace.Mode.JSON;
+    ace.Mode.extensionMap['yaml_'] = ace.Mode.YAML;
+    // The extension that "Refactor for CSP" feature assigns to originals of
+    // refactored HTMLs.
+    ace.Mode.extensionMap['html.pre_csp'] = ace.Mode.HTML;
 
-    _setupOutline(prefs);
     _setupGotoLine();
 
-    var node = parentElement.getElementsByClassName("ace_content")[0];
-    node.onClick.listen((e) {
-      bool accelKey = PlatformInfo.isMac ? e.metaKey : e.ctrlKey;
-      if (accelKey) _onGotoDeclarationController.add(null);
-    });
+    _aceEditor.setOption('enableMultiselect', SparkFlags.enableMultiSelect);
+    if (!SparkFlags.enableMultiSelect) {
+      // Setup ACCEL + clicking on declaration
+      var node = parentElement.getElementsByClassName("ace_content")[0];
+      node.onClick.listen((e) {
+        bool accelKey = PlatformInfo.isMac ? e.metaKey : e.ctrlKey;
+        if (accelKey) _onGotoDeclarationController.add(null);
+      });
+    }
   }
 
-  void _setupOutline(PreferenceStore prefs) {
-    outline = new Outline(_analysisService, parentElement, prefs);
-
+  void setupOutline(html.Element outlineContainer) {
+    outline = new Outline(_analysisService, outlineContainer, _prefs.prefsStore);
+    outline.visible = false;
     outline.onChildSelected.listen((OutlineItem item) {
       ace.Point startPoint =
           currentSession.document.indexToPosition(item.nameStartOffset);
@@ -425,19 +614,18 @@ class AceManager {
 
     ace.Point lastCursorPosition =  new ace.Point(-1, -1);
     _aceEditor.onChangeSelection.listen((_) {
-      ace.Point newCursorPosition = _aceEditor.cursorPosition;
-      // Cancel the last outline selection update
-      if (lastCursorPosition != newCursorPosition) {
-        int cursorOffset = currentSession.document.positionToIndex(
-            newCursorPosition);
-        outline.selectItemAtOffset(cursorOffset);
+      ace.Point currentPosition = _aceEditor.cursorPosition;
+      // Cancel the last outline selection update.
+      if (lastCursorPosition != currentPosition) {
+        outline.selectItemAtOffset(
+            currentSession.document.positionToIndex(currentPosition));
+        lastCursorPosition = currentPosition;
       }
-      lastCursorPosition = newCursorPosition;
     });
   }
 
+  // Set up the goto line dialog.
   void _setupGotoLine() {
-    // Set up the goto line dialog.
     gotoLineView = new GotoLineView();
     if (gotoLineView is! GotoLineView) {
       html.querySelector('#splashScreen').style.backgroundColor = 'red';
@@ -449,6 +637,23 @@ class AceManager {
     parentElement.onKeyDown
         .where((e) => e.keyCode == html.KeyCode.ESC)
         .listen((_) => gotoLineView.hide());
+  }
+
+  void _setLinkingMarker(ace.Range markerRange) {
+    // Always remove a previous hover
+    if (_linkingMarkerId != null) {
+      _markerSession.removeMarker(_linkingMarkerId);
+      _linkingMarkerId = null;
+    }
+
+    html.DivElement contentElement =
+        _aceEditor.renderer.containerElement.querySelector(".ace_content");
+
+    if (markerRange != null) {
+      _markerSession = currentSession;
+      _linkingMarkerId = _markerSession.addMarker(markerRange,
+          "ace_link_marker", type: ace.Marker.TEXT);
+    }
   }
 
   bool isFileExtensionEditable(String extension) {
@@ -626,6 +831,7 @@ class AceManager {
 
   void setFontSize(num size) {
     _aceEditor.fontSize = size;
+    outline.setFontSize(size);
   }
 
   void focus() => _aceEditor.focus();
@@ -642,31 +848,14 @@ class AceManager {
   }
 
   ace.EditSession createEditSession(String text, String fileName) {
-    ace.EditSession session = ace.createEditSession(
-        text, new ace.Mode.forFile(fileName));
-    _applyCustomSession(session, fileName);
+    ace.EditSession session = ace.createEditSession(text,
+        new ace.Mode.forFile(fileName));
+    // Disable Ace's analysis (this shows up in JavaScript files).
+    session.useWorker = false;
     return session;
   }
 
-  void _applyCustomSession(ace.EditSession session, String fileName) {
-    String extention = path.extension(fileName);
-    switch (extention) {
-      case '.dart':
-        session.tabSize = 2;
-        session.useSoftTabs = true;
-        break;
-      default:
-        // For now, 2-space for all file types by default. This can be changed
-        // in the future.
-        session.tabSize = 2;
-        session.useSoftTabs = true;
-        break;
-    }
-    // Disable Ace's analysis (this shows up in JavaScript files).
-    session.useWorker = false;
-  }
-
-  ace.EditSession get currentSession => _aceEditor.session;
+  ace.EditSession get currentSession => _currentSession;
 
   void switchTo(ace.EditSession session, [workspace.File file]) {
     if (_foldListenerSubscription != null) {
@@ -675,9 +864,12 @@ class AceManager {
     }
 
     if (session == null) {
-      _aceEditor.session = ace.createEditSession('', new ace.Mode('ace/mode/text'));
+      _currentSession = ace.createEditSession('', new ace.Mode('ace/mode/text'));
+      _aceEditor.session = _currentSession;
+      currentFile = null;
     } else {
-      _aceEditor.session = session;
+      _currentSession = session;
+      _aceEditor.session = _currentSession;
 
       _foldListenerSubscription = currentSession.onChangeFold.listen((_) {
         setMarkers(file.getMarkers());
@@ -699,13 +891,14 @@ class AceManager {
 
       setMarkers(file.getMarkers());
       session.onChangeScrollTop.listen((_) => Timer.run(() {
-        if (outline.visible) {
+        if (outline.showing) {
           int firstCursorOffset = currentSession.document.positionToIndex(
               new ace.Point(_aceEditor.firstVisibleRow, 0));
           int lastCursorOffset = currentSession.document.positionToIndex(
               new ace.Point(_aceEditor.lastVisibleRow, 0));
 
-          outline.scrollToOffsets(firstCursorOffset, lastCursorOffset);
+          outline.scrollOffsetRangeIntoView(
+              new OffsetRange(firstCursorOffset, lastCursorOffset));
         }
       }));
     }
@@ -742,19 +935,19 @@ class AceManager {
   void _handleGotoLineViewClosed(_) => focus();
 
   void _scrollToBeginningOfDocument(_) {
-    _aceEditor.session.scrollTop = 0;
+    _currentSession.scrollTop = 0;
   }
 
   void _scrollToEndOfDocument(_) {
     int lineHeight = html.querySelector('.ace_gutter-cell').clientHeight;
-    _aceEditor.session.scrollTop = _aceEditor.session.document.length * lineHeight;
+    _currentSession.scrollTop = _currentSession.document.length * lineHeight;
   }
 
   NavigationLocation get navigationLocation {
     if (currentFile == null) return null;
     ace.Range range = _aceEditor.selection.range;
-    int offsetStart = _aceEditor.session.document.positionToIndex(range.start);
-    int offsetEnd = _aceEditor.session.document.positionToIndex(range.end);
+    int offsetStart = _currentSession.document.positionToIndex(range.start);
+    int offsetEnd = _currentSession.document.positionToIndex(range.end);
     Span span = new Span(offsetStart, offsetEnd - offsetStart);
     return new NavigationLocation(currentFile, span);
   }
@@ -762,14 +955,48 @@ class AceManager {
 
 class ThemeManager {
   static final LIGHT_THEMES = [
-      'textmate', 'tomorrow'
+      'textmate',
+      'tomorrow',
+  ];
+  static final MORE_LIGHT_THEMES = [
+      'chrome',
+      'clouds',
+      'crimson_editor',
+      'dawn',
+      'dreamweaver',
+      'eclipse',
+      'github',
+      'katzenmilch',
+      'kuroir',
+      'solarized_light',
+      'xcode',
   ];
   static final DARK_THEMES = [
-      'monokai', 'tomorrow_night', 'idle_fingers', 'pastel_on_dark'
+      'monokai',
+      'idle_fingers',
+      'tomorrow_night',
+      'pastel_on_dark',
+  ];
+  static final MORE_DARK_THEMES = [
+      'ambiance',
+      'chaos',
+      'clouds_midnight',
+      'cobalt',
+      'kr_theme',
+      'merbivore',
+      'merbivore_soft',
+      'mono_industrial',
+      'solarized_dark',
+      'terminal',
+      'tomorrow_night_blue',
+      'tomorrow_night_bright',
+      'tomorrow_night_eighties',
+      'twilight',
+      'vibrant_ink',
   ];
 
   ace.Editor _aceEditor;
-  PreferenceStore _prefs;
+  SparkPreferences _prefs;
   html.Element _label;
   List<String> _themes = [];
 
@@ -777,14 +1004,15 @@ class ThemeManager {
       _aceEditor = aceManager._aceEditor {
     if (SparkFlags.useAceThemes) {
       if (SparkFlags.useDarkAceThemes) _themes.addAll(DARK_THEMES);
+      if (SparkFlags.useMoreDarkAceThemes) _themes.addAll(MORE_DARK_THEMES);
       if (SparkFlags.useLightAceThemes) _themes.addAll(LIGHT_THEMES);
+      if (SparkFlags.useMoreLightAceThemes) _themes.addAll(MORE_LIGHT_THEMES);
 
-      _prefs.getValue('aceTheme').then((String theme) {
-        if (theme == null || theme.isEmpty || !_themes.contains(theme)) {
-          theme = _themes[0];
-        }
-        _updateTheme(theme);
-      });
+      String theme = _prefs.editorTheme.getValue();
+      if (theme == null || theme.isEmpty || !_themes.contains(theme)) {
+        theme = _themes[0];
+      }
+      _updateTheme(theme);
     } else {
       _themes.add(DARK_THEMES[0]);
       _updateTheme(_themes[0]);
@@ -810,7 +1038,7 @@ class ThemeManager {
 
   void _updateTheme(String theme) {
     if (SparkFlags.useAceThemes) {
-      _prefs.setValue('aceTheme', theme);
+      _prefs.editorTheme.setValue(theme);
     }
     _aceEditor.theme = new ace.Theme.named(theme);
     if (_label != null) {
@@ -821,16 +1049,15 @@ class ThemeManager {
 
 class KeyBindingManager {
   AceManager aceManager;
-  PreferenceStore prefs;
+  SparkPreferences prefs;
   html.Element _label;
 
   KeyBindingManager(this.aceManager, this.prefs, this._label) {
-    prefs.getValue('keyBindings').then((String value) {
-      if (value != null) {
-        aceManager.setKeyBinding(value);
-      }
-      _updateName(value);
-    });
+    String value = prefs.keyBindings.getValue();
+    if (value != null) {
+      aceManager.setKeyBinding(value);
+    }
+    _updateName(value);
   }
 
   void inc(html.Event e) {
@@ -848,7 +1075,7 @@ class KeyBindingManager {
       int index = math.max(AceManager.KEY_BINDINGS.indexOf(name), 0);
       index = (index + direction) % AceManager.KEY_BINDINGS.length;
       String newBinding = AceManager.KEY_BINDINGS[index];
-      prefs.setValue('keyBindings', newBinding);
+      prefs.keyBindings.setValue(newBinding);
       _updateName(newBinding);
       aceManager.setKeyBinding(newBinding);
     });
@@ -861,7 +1088,7 @@ class KeyBindingManager {
 
 class AceFontManager {
   AceManager aceManager;
-  PreferenceStore prefs;
+  SparkPreferences prefs;
   html.Element _label;
   num _value;
 
@@ -869,27 +1096,25 @@ class AceFontManager {
     _value = aceManager.getFontSize();
     _updateLabel(_value);
 
-    prefs.getValue('fontSize').then((String pref) {
-      try {
-        _value = num.parse(pref);
-        aceManager.setFontSize(_value);
-        _updateLabel(_value);
-      } catch (e) {
+    try {
+      _value = prefs.editorFontSize.getValue();
+      aceManager.setFontSize(_value);
+      _updateLabel(_value);
+    } catch (e) {
 
-      }
-    });
+    }
   }
 
-  void dec() => _adjustSize(_value - 2);
+  void dec() => _adjustSize(_value - 1);
 
-  void inc() => _adjustSize(_value + 2);
+  void inc() => _adjustSize(_value + 1);
 
   void _adjustSize(num newValue) {
     // Clamp to between 6pt and 36pt.
     _value = newValue.clamp(6, 36);
     aceManager.setFontSize(_value);
     _updateLabel(_value);
-    prefs.setValue('fontSize', _value.toString());
+    prefs.editorFontSize.setValue(_value);
   }
 
   void _updateLabel(num size) {
@@ -915,4 +1140,37 @@ String _calcMD5(String text) {
   crypto.MD5 md5 = new crypto.MD5();
   md5.add(text.codeUnits);
   return crypto.CryptoUtils.bytesToHex(md5.close());
+}
+
+/**
+ * Given some arbitrary text and an offset into it, attempt to return the
+ * parts of the offset surrounded by quotes.
+ */
+String _getQuotedString(String text, int offset) {
+  if (text.isEmpty) return null;
+
+  offset = offset.clamp(0, math.max(0, text.length - 1));
+  int leftSide = offset;
+
+  while (leftSide >= 0) {
+    String c = text[leftSide];
+    if (c == '\n' || leftSide == 0) return null;
+    if (c == "'" || c == '"') break;
+    leftSide--;
+  }
+
+  leftSide++;
+  int rightSide = offset;
+
+  while ((rightSide + 1) < text.length) {
+    String c = text[rightSide];
+    if (c == "'" || c == '"') {
+      rightSide--;
+      break;
+    }
+    if (c == '\n') break;
+    rightSide++;
+  }
+
+  return text.substring(leftSide, rightSide + 1);
 }

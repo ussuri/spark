@@ -22,7 +22,7 @@ import 'ui/widgets/imageviewer.dart';
 import 'utils.dart';
 
 // The auto-save delay - the time from the last user edit to the file auto-save.
-final int _DELAY_MS = 1000;
+const int _DELAY_MS = 1000;
 
 /**
  * Classes implement this interface provides/refreshes editors for [Resource]s.
@@ -128,7 +128,7 @@ class EditorManager implements EditorProvider, NavigationLocationProvider {
     });
   }
 
-  PreferenceStore get _prefStore => _prefs.prefStore;
+  PreferenceStore get _prefStore => _prefs.prefsStore;
 
   File get currentFile => _currentState != null ? _currentState.file : null;
 
@@ -168,7 +168,7 @@ class EditorManager implements EditorProvider, NavigationLocationProvider {
 
   bool isFileOpened(File file) => _getStateFor(file) != null;
 
-  void saveAll() => _saveAll();
+  void saveAll() => _saveAll(userAction: true);
 
   void close(File file) {
     _EditorState state = _getStateFor(file);
@@ -316,10 +316,11 @@ class EditorManager implements EditorProvider, NavigationLocationProvider {
     _eventBus.addEvent(new FileModifiedBusEvent(currentFile));
 
     if (_timer != null) _timer.cancel();
-    _timer = new Timer(new Duration(milliseconds: _DELAY_MS), () => _saveAll());
+    _timer = new Timer(new Duration(milliseconds: _DELAY_MS), () =>
+        _saveAll(userAction: false));
   }
 
-  void _saveAll() {
+  void _saveAll({bool userAction: false}) {
     if (_timer != null) {
       _timer.cancel();
       _timer = null;
@@ -339,9 +340,14 @@ class EditorManager implements EditorProvider, NavigationLocationProvider {
     }
 
     if (wasDirty) {
-      _eventBus.addEvent(
-          new SimpleBusEvent(BusEventType.EDITOR_MANAGER__FILES_SAVED));
-    } else {
+      if (userAction) {
+        _eventBus.addEvent(
+            new SimpleBusEvent(BusEventType.EDITOR_MANAGER__FILES_SAVED));
+      } else {
+        _eventBus.addEvent(
+            new SimpleBusEvent(BusEventType.EDITOR_MANAGER__FILES_SAVED_AUTOMATICALLY));
+      }
+    } else if (userAction) {
       _eventBus.addEvent(
           new SimpleBusEvent(BusEventType.EDITOR_MANAGER__NO_MODIFICATIONS));
     }
@@ -390,6 +396,7 @@ class EditorManager implements EditorProvider, NavigationLocationProvider {
       editor = new ImageViewer(file);
     } else {
       editor = new ace.TextEditor(_aceContainer, file, _prefs);
+      editor.resize();
     }
 
     _editorMap[file] = editor;
@@ -404,6 +411,10 @@ class EditorManager implements EditorProvider, NavigationLocationProvider {
   }
 
   NavigationLocation get navigationLocation => _aceContainer.navigationLocation;
+
+  void setupOutline(html.Element outlineContainer) {
+    _aceContainer.setupOutline(outlineContainer);
+  }
 }
 
 /**
@@ -414,7 +425,7 @@ class _EditorState {
   File file;
   ace.EditSession session;
 
-  int scrollTop = 0;
+  num scrollTop = 0;
   html.Point cursorPosition = new html.Point(0, 0);
 
   _EditorState.fromFile(this.manager, this.file);

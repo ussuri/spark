@@ -11,15 +11,18 @@ import 'package:chrome/chrome_app.dart' as chrome;
 import 'package:polymer/polymer.dart' as polymer;
 import 'package:spark_widgets/spark_button/spark_button.dart';
 import 'package:spark_widgets/spark_dialog/spark_dialog.dart';
+import 'package:spark_widgets/spark_splitter/spark_splitter.dart';
 
 import 'spark.dart';
-import 'spark_flags.dart';
+import 'spark_bootstrap.dart';
 import 'spark_polymer_ui.dart';
 import 'lib/actions.dart';
 import 'lib/app.dart';
 import 'lib/event_bus.dart';
 import 'lib/jobs.dart';
 import 'lib/platform_info.dart';
+import 'lib/preferences.dart';
+import 'lib/spark_flags.dart';
 import 'lib/workspace.dart' as ws;
 
 class _TimeLogger {
@@ -49,10 +52,12 @@ final _logger = new _TimeLogger();
 
 @polymer.initMethod
 void main() {
-  // app.json stores global per-app flags and is overwritten by the build
-  // process (`grind deploy`).
+  registerWidgetsWithPolymer();
+
+  // app.json stores the default app configuration.
   // user.json can be manually added to override some of the flags from app.json
-  // or add new flags that will survive the build process.
+  // or add other supported flags; the benefit of adding user.dart as opposed
+  // to modifying app.json is that user.json is ignored by git.
   final List<Future<String>> flagsReaders = [
       HttpRequest.getString(chrome.runtime.getURL('app.json')),
       HttpRequest.getString(chrome.runtime.getURL('user.json'))
@@ -92,7 +97,7 @@ class SparkPolymerDialog implements Dialog {
   void hide() => _dialogElement.hide();
 
   @override
-  Element get dialog => _dialogElement;
+  SparkDialog get dialog => _dialogElement;
 
   @override
   Element getElement(String selectors) =>
@@ -105,16 +110,26 @@ class SparkPolymerDialog implements Dialog {
   @override
   Element getShadowDomElement(String selectors) =>
       _dialogElement.shadowRoot.querySelector(selectors);
+
+  @override
+  bool get activityVisible => _dialogElement.activityVisible;
+
+  @override
+  void set activityVisible(bool visible) {
+    _dialogElement.activityVisible = visible;
+  }
 }
 
 class SparkPolymer extends Spark {
   SparkPolymerUI _ui;
 
-  Future openFolder() {
+  Future<SparkJobStatus> openFolder(chrome.DirectoryEntry entry) {
     return _beforeSystemModal()
-        .then((_) => super.openFolder())
-        .then((_) => _systemModalComplete())
-        .catchError((e) => _systemModalComplete());
+        .then((_) => super.openFolder(entry))
+        .then((status) {
+          _systemModalComplete();
+          return status;
+        }).catchError((e) => _systemModalComplete());
   }
 
   Future openFile() {
@@ -124,7 +139,7 @@ class SparkPolymer extends Spark {
         .catchError((e) => _systemModalComplete());
   }
 
-  Future importFolder([List<ws.Resource> resources]) {
+  Future<SparkJobStatus> importFolder([List<ws.Resource> resources]) {
     return _beforeSystemModal()
         .then((_) => super.importFolder(resources))
         .whenComplete(() => _systemModalComplete());
@@ -184,17 +199,44 @@ class SparkPolymer extends Spark {
   void initEditorManager() => super.initEditorManager();
 
   @override
-  void initEditorArea() => super.initEditorArea();
+  void initEditorArea() {
+    super.initEditorArea();
+
+    // TODO(ussuri): Redo once the TODO before #aceContainer in *.html is done.
+    final SparkSplitter outlineResizer = querySelector('#outlineResizer');
+    syncPrefs.getValue('outlineSize', '200').then((String position) {
+      int value = int.parse(position, onError: (_) => null);
+      if (value != null) {
+        // TODO(ussuri): BUG #2252. Note: deliverChanges() here didn't work
+        // in deployed code, unlike the similar snippet below.
+        outlineResizer
+            ..targetSize = value
+            ..targetSizeChanged();
+      }
+    });
+    outlineResizer.on['update'].listen(_onOutlineSizeUpdate);
+  }
 
   @override
   void initSplitView() {
     syncPrefs.getValue('splitViewPosition', '300').then((String position) {
       int value = int.parse(position, onError: (_) => null);
       if (value != null) {
-        _ui.splitViewPosition = value;
-        _ui.deliverChanges();
+        // TODO(ussuri): BUG #2252.
+        _ui
+            ..splitViewPosition = value
+            ..deliverChanges();
       }
     });
+  }
+
+  int _mouseX = -1;
+  int _mouseY = -1;
+  bool mouseInStatusArea = false;
+  static const int statusComponentHeight = 60;
+
+  void updateStatusVisibility() {
+    statusComponent.classes.toggle('hovered', mouseInStatusArea);
   }
 
   @override
@@ -215,14 +257,36 @@ class SparkPolymer extends Spark {
 
     // Listen for job manager events.
     jobManager.onChange.listen((JobManagerEvent event) {
-      if (event.started) {
-        statusComponent.spinning = true;
-        statusComponent.progressMessage = event.job.name;
-      } else if (event.finished) {
+      if (event.finished) {
         statusComponent.spinning = false;
         statusComponent.progressMessage = null;
+      } else {
+        statusComponent.spinning = true;
+        statusComponent.progressMessage = event.toString();
       }
     });
+
+    Function updateMousePosition = ((e) {
+      if (e == null) {
+        _mouseX = -1;
+        _mouseY = -1;
+      } else {
+        _mouseX = e.page.x;
+        _mouseY = e.page.y;
+      }
+      if (_mouseX == -1) {
+        mouseInStatusArea = false;
+        updateStatusVisibility();
+        return;
+      }
+      mouseInStatusArea =
+          (document.body.clientHeight - _mouseY <= statusComponentHeight);
+      updateStatusVisibility();
+    });
+    Element editorArea = querySelector('#editorArea');
+    editorArea.onMouseMove.listen(updateMousePosition);
+    editorArea.onMouseEnter.listen(updateMousePosition);
+    editorArea.onMouseLeave.listen((e) => updateMousePosition(null));
   }
 
   @override
@@ -238,6 +302,7 @@ class SparkPolymer extends Spark {
     _bindButtonToAction('runButton', 'application-run');
     _bindButtonToAction('leftNav', 'navigate-back');
     _bindButtonToAction('rightNav', 'navigate-forward');
+    _bindButtonToAction('settingsButton', 'settings');
   }
 
   @override
@@ -249,11 +314,6 @@ class SparkPolymer extends Spark {
   @override
   Future restoreLocationManager() => super.restoreLocationManager();
 
-  @override
-  void menuActivateEventHandler(CustomEvent event) {
-    _ui.onMenuSelected(event, event.detail);
-  }
-
   //
   // - End parts of the parent's init().
   //
@@ -263,17 +323,27 @@ class SparkPolymer extends Spark {
     syncPrefs.setValue('splitViewPosition', position.toString());
   }
 
+  // TODO(ussuri): Redo once the TODO before #aceContainer in *.html is done.
+  void _onOutlineSizeUpdate(CustomEvent e) {
+    syncPrefs.setValue('outlineSize', e.detail['targetSize'].toString());
+    // The top-level [spark-split-view] in [_ui] also listens to the same event.
+    e.stopImmediatePropagation();
+  }
+
   void _bindButtonToAction(String buttonId, String actionId) {
     SparkButton button = getUIElement('#${buttonId}');
     Action action = actionManager.getAction(actionId);
     action.onChange.listen((_) {
-      button.disabled = !action.enabled;
-      button.deliverChanges();
+      // TODO(ussuri): This and similar line below should be
+      // `button.disabled = ...`, however in dart2js version
+      // Polymer refused to see and apply such changes; HTML attr here works.
+      // See original version under git tag 'before-button-hack-to-fix-states'.
+      button.setAttr('disabled', !action.enabled);
     });
     button.onClick.listen((_) {
       if (action.enabled) action.invoke();
     });
-    button.disabled = !action.enabled;
+    button.setAttr('disabled', !action.enabled);
   }
 
   @override
@@ -309,6 +379,8 @@ class SparkPolymer extends Spark {
 }
 
 class _SparkSetupParticipant extends LifecycleParticipant {
+  static final String FIRST_RUN_PREF = 'firstRun';
+
   Future applicationStarting(Application app) {
     final SparkPolymer spark = app;
     return PlatformInfo.init().then((_) {
@@ -321,10 +393,24 @@ class _SparkSetupParticipant extends LifecycleParticipant {
 
   Future applicationStarted(Application app) {
     final SparkPolymer spark = app;
+    final PreferenceStore prefs = spark.localPrefs;
+
     spark._ui.modelReady(spark);
     spark.unveil();
-    _logger.logStep('Spark started');
+
+    _logger.logStep('Chrome Dev Editor started');
     _logger.logElapsed('Total startup time');
+
+    prefs.getValue(FIRST_RUN_PREF).then((String value) {
+      if (value != 'false') {
+        new Future.delayed(new Duration(milliseconds: 500), () {
+          spark.actionManager.getAction('help-about').invoke();
+        });
+      }
+
+      prefs.setValue(FIRST_RUN_PREF, false.toString());
+    });
+
     return new Future.value();
   }
 

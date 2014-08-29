@@ -4,7 +4,6 @@
 
 library spark_widgets.menu_button;
 
-import 'dart:async';
 import 'dart:html';
 
 import 'package:polymer/polymer.dart';
@@ -25,89 +24,82 @@ class SparkMenuButton extends SparkWidget {
   static final List<String> _SUPPORTED_ARROWS = [
     'none', 'top-center', 'top-left', 'top-right'
   ];
-  
+
   SparkButton _button;
   SparkOverlay _overlay;
   SparkMenu _menu;
 
-  final List<bool> _toggleQueue = [];
-  Timer _toggleTimer;
+  /**
+   * The state of the menu on `mouseDown`.
+   */
+  bool _mouseDownOpened;
 
   SparkMenuButton.created(): super.created();
 
   @override
-  void enteredView() {
-    super.enteredView();
+  void attached() {
+    super.attached();
 
     assert(_SUPPORTED_ARROWS.contains(arrow));
 
     _overlay = $['overlay'];
+    // TODO(ussuri): This lets _overlay handle ESC but breaks _button's
+    // active state when menu is open.
+    //SparkWidget.enableKeyboardEvents(_overlay);
+
     _menu = $['menu'];
 
     final ContentElement buttonCont = $['button'];
     assert(buttonCont.getDistributedNodes().isNotEmpty);
     _button = buttonCont.getDistributedNodes().first;
     _button
+        ..onMouseDown.listen(mouseDownHandler)
         ..onClick.listen(clickHandler)
         ..onFocus.listen(focusHandler)
         ..onBlur.listen(blurHandler);
   }
 
   /**
-   * Schedule a toggle of the opened state of the dropdown. Don't toggle right
-   * away, as there can be multiple events coming in a quick succession
-   * following a user gesture (e.g. a click on the button can trigger
-   * blur->click->focus, and possibly on-closed as well). Instead,
-   * aggregate arriving events for a short while after the first one,
-   * then compute their net effect and commit.
+   * Update 'opened' state.
    */
-  void _toggle(bool inOpened) {
-    _toggleQueue.add(inOpened);
-    if (_toggleTimer == null) {
-      _toggleTimer = new Timer(
-          const Duration(milliseconds: 200), _completeToggle);
-    }
-  }
-
-  /**
-   * Complete the toggling process, see [_toggle].
-   */
-  void _completeToggle() {
-    // Most likely, all aggregated events for a single gesture will have the 
-    // same value (either 'close' or 'open'), but we don't count on that and
-    // formally && all the values just in case.
-    final bool newOpened = _toggleQueue.reduce((a, b) => a && b);
+  void _toggle(bool newOpened) {
     if (newOpened != opened) {
       opened = newOpened;
-      // TODO(ussuri): A temporary plug to make #overlay and #button see
-      // changes in 'opened'. Data binding via {{opened}} in the HTML isn't
-      // detected. deliverChanges() fixes #overlay, but not #button.
+      // TODO(ussuri): A hack to make #overlay and #button see
+      // changes in 'opened'. Data binding via {{opened}} in the HTML wasn't
+      // detected. deliverChanges() here fix #overlay, but not #button.
+      // setAttr() fixes #button, but break #overlay. See BUG #2252.
       _overlay..opened = newOpened..deliverChanges();
-      _button..active = newOpened..deliverChanges();
+      _button.setAttr('active', newOpened);
       if (newOpened) {
         // Enforce focused state so the button can accept keyboard events.
         focus();
         _menu.resetState();
       }
     }
-    _toggleQueue.clear();
-    _toggleTimer.cancel();
-    _toggleTimer = null;
   }
 
-  void clickHandler(Event e) => _toggle(!opened);
+  /**
+   * The menu state should be toggle on click.
+   * Hovewer what is a single click the from user's perspective is a sequence
+   * of DOM events: mouseDown, focus, mouseUp, click.
+   * We force the menu open on `focus`, so we need to remember the [opened]
+   * state on `mouseDown` into [_mouseDownOpened] and use in [clickHandler].
+   */
+  void mouseDownHandler(Event e) {
+    _mouseDownOpened = opened;
+  }
+
+  /**
+   * Toggles [opened] state depending on [_mouseDownOpened].
+   */
+  void clickHandler(Event e) => _toggle(!_mouseDownOpened);
 
   void focusHandler(Event e) => _toggle(true);
 
-  void blurHandler(Event e) => _toggle(false);
-
-  /**
-   * Handle the on-opened event from the dropdown. It will be fired e.g. when
-   * mouse is clicked outside the dropdown (with autoClosedDisabled == false).
-   */
-  void overlayOpenedHandler(CustomEvent e) {
-    // Autoclosing is the only event we're interested in.
-    if (e.detail == false) {
+  void blurHandler(FocusEvent e) {
+    var target = e.relatedTarget;
+    if (target != null && !contains(target)) {
       _toggle(false);
     }
   }
@@ -121,20 +113,25 @@ class SparkMenuButton extends SparkWidget {
   void keyDownHandler(KeyboardEvent e) {
     bool stopPropagation = true;
 
-    if (_menu.maybeHandleKeyStroke(e.keyCode)) {
+    // If the menu is opened, give it a chance to handle the keystroke,
+    // e.g. select the current item on ENTER or SPACE.
+    if (opened && _menu.maybeHandleKeyStroke(e.keyCode)) {
       e.preventDefault();
     }
 
+    // Continue handling the keystroke regardless of whether the menu has
+    // handled it: we might still to take an action (e.g. close the menu on
+    // ENTER).
     switch (e.keyCode) {
       case KeyCode.UP:
       case KeyCode.DOWN:
       case KeyCode.PAGE_UP:
       case KeyCode.PAGE_DOWN:
       case KeyCode.ENTER:
-        if (!opened) opened = true;
+        _toggle(true);
         break;
       case KeyCode.ESC:
-        this.blur();
+        _toggle(false);
         break;
       default:
         stopPropagation = false;

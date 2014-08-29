@@ -10,10 +10,11 @@ import 'package:polymer/polymer.dart';
 import 'package:spark_widgets/common/spark_widget.dart';
 import 'package:spark_widgets/spark_split_view/spark_split_view.dart';
 
-import 'spark_flags.dart';
 import 'spark_model.dart';
 import 'lib/event_bus.dart';
+import 'lib/filesystem.dart';
 import 'lib/platform_info.dart';
+import 'lib/spark_flags.dart';
 
 @CustomTag('spark-polymer-ui')
 class SparkPolymerUI extends SparkWidget {
@@ -29,10 +30,13 @@ class SparkPolymerUI extends SparkWidget {
   // The values are later set to their actual values in [refreshFromModel].
   @observable bool developerMode = true;
   @observable bool useAceThemes = true;
-  @observable bool showWipProjectTemplates = true;
   @observable bool chromeOS = false;
-
-  @observable bool showNoFileFilterMatches = false;
+  @observable String appVersion = '';
+  // This flag is different from the rest: the comment immediately above doesn't
+  // apply to it, because nothing in the app code depends on the chunks of HTML
+  // that it controls, so it doesn't have to be on at start-up time in order to
+  // not break the app.
+  @observable bool showWipProjectTemplates = false;
 
   SparkSplitView _splitView;
   InputElement _fileFilter;
@@ -40,8 +44,8 @@ class SparkPolymerUI extends SparkWidget {
   SparkPolymerUI.created() : super.created();
 
   @override
-  void enteredView() {
-    super.enteredView();
+  void attached() {
+    super.attached();
 
     _splitView = $['splitView'];
     _fileFilter = $['fileFilter'];
@@ -62,6 +66,7 @@ class SparkPolymerUI extends SparkWidget {
     useAceThemes = SparkFlags.useAceThemes;
     showWipProjectTemplates = SparkFlags.showWipProjectTemplates;
     chromeOS = PlatformInfo.isCros;
+    appVersion = _model.appVersion;
 
     // This propagates external changes down to the enclosed widgets.
     Observable.dirtyCheck();
@@ -70,9 +75,11 @@ class SparkPolymerUI extends SparkWidget {
   void splitViewPositionChanged() {
     // TODO(ussuri): In deployed code, this was critical for correct
     // propagation of the client's changes in [splitViewPosition] to _splitView.
-    // Investigate.
+    // Investigate. `targetSizeChanged()` is due to BUG #2252.
     if (IS_DART2JS) {
-      _splitView..targetSize = splitViewPosition..targetSizeChanged();
+      _splitView
+          ..targetSize = splitViewPosition
+          ..targetSizeChanged();
     }
   }
 
@@ -119,15 +126,25 @@ class SparkPolymerUI extends SparkWidget {
     _model.setGitSettingsResetDoneVisible(true);
   }
 
+  void onClickRootDirectory() {
+    fileSystemAccess.chooseNewProjectLocation(false).then((LocationResult res){
+      if (res != null) {
+        _model.showRootDirectory();
+      }
+    });
+  }
+
+  // TODO(ussuri): Find a better way to achieve this.
   void onResetPreference() {
-    Element resultElement = getShadowDomElement('#preferenceResetResult');
+    Element resultElement = $['preferenceResetResult'];
+    resultElement.style.display = 'block';
     resultElement.text = '';
     _model.syncPrefs.clear().then((_) {
       _model.localPrefs.clear();
     }).catchError((e) {
-      resultElement.text = '<error reset preferences>';
+      resultElement.text = 'Error resetting preferences';
     }).then((_) {
-      resultElement.text = 'Preferences are reset. Restart Spark.';
+      resultElement.text = 'Preferences have been reset - restart Chrome Dev Editor';
     });
   }
 
@@ -142,24 +159,16 @@ class SparkPolymerUI extends SparkWidget {
       e..preventDefault()..stopPropagation();
       _fileFilter.value = '';
       _updateFileFilterActive(false);
-      _updateFileFilterNoMatches(false);
       _model.filterFilesList(null);
     }
   }
 
   void fileFilterInputHandler(Event e) {
     _updateFileFilterActive(_fileFilter.value.isNotEmpty);
-    _model.filterFilesList(_fileFilter.value).then((bool matchesFound) {
-      _updateFileFilterNoMatches(!matchesFound);
-    });
+    _model.filterFilesList(_fileFilter.value);
   }
 
   void _updateFileFilterActive(bool active) {
     _fileFilter.classes.toggle('active', active);
-  }
-
-  void _updateFileFilterNoMatches(bool showNoMatchesFound) {
-    showNoFileFilterMatches = showNoMatchesFound;
-    deliverChanges();
   }
 }

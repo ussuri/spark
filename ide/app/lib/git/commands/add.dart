@@ -24,15 +24,14 @@ class Add {
    * Returns the updated status of the [entry].
    */
   static Future<FileStatus> addEntry(GitOptions options, chrome.Entry entry) {
-    return Status.getFileStatus(options.store, entry).then((FileStatus status) {
+    return Status.updateAndGetStatus(options.store, entry).then(
+        (FileStatus status) {
       if (status.type == FileStatusType.UNTRACKED) {
-        return FileStatus.createFromEntry(entry).then((FileStatus status) {
-          status.type = FileStatusType.MODIFIED;
-          return options.store.index.updateIndexForEntry(status);
-        });
-      } else {
-        return status;
+        status = FileStatus.createFromEntry(entry);
+        status.type = FileStatusType.MODIFIED;
+        options.store.index.updateIndexForEntry(entry, status);
       }
+      return status;
     });
   }
 

@@ -13,6 +13,7 @@ import 'dart:html' hide File;
 
 import 'ace.dart' as ace;
 import 'editors.dart';
+import 'filesystem.dart';
 import 'ui/widgets/tabview.dart';
 import 'ui/widgets/imageviewer.dart';
 import 'workspace.dart';
@@ -23,6 +24,9 @@ abstract class EditorTab extends Tab {
 
   EditorTab(EditorArea parent, this.file) : super(parent) {
     label = file.name;
+    _calculateTooltip(file).then((value) {
+      tooltip = value;
+    }).catchError((e) => null);
   }
 
   void resize();
@@ -38,6 +42,8 @@ class AceEditorTab extends EditorTab {
   final Editor editor;
   final EditorProvider provider;
 
+  bool _active = false;
+
   AceEditorTab(EditorArea parent, this.provider, this.editor, Resource file)
     : super(parent, file) {
     page = editor.element;
@@ -45,13 +51,15 @@ class AceEditorTab extends EditorTab {
   }
 
   void activate() {
+    _active = true;
     editor.activate();
     provider.activate(editor);
     super.activate();
   }
 
   void deactivate() {
-    editor.deactivate();
+    if (_active) editor.deactivate();
+    _active = false;
     super.deactivate();
   }
 
@@ -109,8 +117,7 @@ class EditorArea extends TabView {
 
     _workspace.onResourceChange.listen((ResourceChangeEvent event) {
       // TODO(dvh): reflect name change instead of closing the file.
-      event =
-          new ResourceChangeEvent.fromList(event.changes, filterRename: true);
+      event = new ResourceChangeEvent.fromList(event.changes, filterRename: true);
       for (ChangeDelta delta in event.changes) {
         if (delta.isDelete && delta.resource.isFile) {
           closeFile(delta.resource);
@@ -239,22 +246,25 @@ class EditorArea extends TabView {
   /// Closes the tab.
   void closeFile(File file) {
     EditorTab tab = _tabOfFile[file];
+
     if (tab != null) {
       remove(tab);
       tab.close();
       editorProvider.close(file);
       _nameController.add(selectedTab == null ? null : selectedTab.label);
+      _savePersistedTabs();
     }
-
-    _savePersistedTabs();
   }
 
-  // Replaces the file loaded in a tab with a renamed version of the file
-  // The new tab is not selected.
+  // Replaces the file loaded in a tab with a renamed version of the file. The
+  // new tab is not selected.
   void renameFile(Resource file) {
     if (_tabOfFile.containsKey(file)) {
       EditorTab tab = _tabOfFile[file];
       tab.label = file.name;
+      _calculateTooltip(file).then((value) {
+        tab.tooltip = value;
+      }).catchError((e) => null);
       _nameController.add(selectedTab.label);
     }
   }
@@ -265,4 +275,10 @@ class EditorArea extends TabView {
       tab.fileContentsChanged();
     }
   }
+}
+
+Future<String> _calculateTooltip(File file) {
+  if (file.entry == null) return new Future.value(file.path);
+
+  return fileSystemAccess.getDisplayPath(file.entry);
 }

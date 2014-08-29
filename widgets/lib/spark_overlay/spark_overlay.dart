@@ -123,61 +123,21 @@ class SparkOverlay extends SparkWidget {
   /**
    * The kind of animation that the overlay should perform on open/close.
    */
-  @published String animation = 'none';
+  @PublishedProperty(reflect: true) String animation = 'none';
 
   static final List<String> _SUPPORTED_ANIMATIONS = [
     'none', 'fade', 'shake', 'scale-slideup'
   ];
 
-  /**
-   * Events to capture on the [document] level in the capturing event
-   * propagation phase and either block them (with [modal]) or auto-close the
-   * overlay (with [autoClose]).
-   */
-  // TODO(ussuri): This list should be amended with 'tap*' events when
-  // PointerEvents are supported.
-  // NOTE(ussuri): Possible other candidates to consider (note that some
-  // may break e.g. manually applied hovering within the overlay itself):
-  // 'mouseenter',
-  // 'mouseleave',
-  // 'mouseover',
-  // 'mouseout',
-  // 'focusin',
-  // 'focusout',
-  // 'scroll',
-  // 'keydown',
-  // 'keypress',
-  // 'keyup'
-  static final List<String> _modalEventTypes = [
-      'mousedown',
-      'mouseup',
-      'click',
-      'wheel',
-      'dblclick',
-      'contextmenu',
-      'focus',
-      'blur',
-  ];
-  static final List<String> _autoCloseEventTypes = [
-      'mousedown',
-      'wheel',
-      'contextmenu',
-  ];
-
   Timer _autoCloseTask = null;
-  // Function closures aren't canonicalized: need to have one pointer for the
-  // listener's handler that is added/removed.
-  EventListener _captureHandlerInst;
-  EventListener _resizeHandlerInst;
 
-  SparkOverlay.created(): super.created() {
-    _captureHandlerInst = _captureHandler;
-    _resizeHandlerInst = resizeHandler;
-  }
+  List<StreamSubscription> _eventSubs = [];
+
+  SparkOverlay.created(): super.created();
 
   @override
-  void enteredView() {
-    super.enteredView();
+  void attached() {
+    super.attached();
 
     assert(_SUPPORTED_ARROWS.contains(arrow));
     assert(_SUPPORTED_ANIMATIONS.contains(animation));
@@ -189,17 +149,24 @@ class SparkOverlay extends SparkWidget {
     // E.g. try to open and close the menu and click in the area where it was.
     // enableKeyboardEvents();
 
-    addEventListener('webkitAnimationStart', _openedAnimationStart);
-    addEventListener('animationStart', _openedAnimationStart);
-    addEventListener('webkitAnimationEnd', _openedAnimationEnd);
-    addEventListener('animationEnd', _openedAnimationEnd);
-    addEventListener('webkitTransitionEnd', _openedTransitionEnd);
-    addEventListener('transitionEnd', _openedTransitionEnd);
-    addEventListener('click', _tapHandler);
-    addEventListener('keydown', _keyDownHandler);
+    window.onAnimationStart.listen(_openedAnimationStart);
+    window.onAnimationEnd.listen(_openedAnimationEnd);
+    onTransitionEnd.listen(_openedTransitionEnd);
+    onClick.listen(_tapHandler);
+    onKeyDown.listen(_keyDownHandler);
   }
 
-  /// Toggle the opened state of the overlay.
+  void show() {
+    if (!opened) opened = true;
+  }
+
+  void hide() {
+    if (opened) opened = false;
+  }
+
+  /**
+   * Toggle the opened state of the overlay.
+   */
   void toggle() {
     opened = !opened;
   }
@@ -209,26 +176,44 @@ class SparkOverlay extends SparkWidget {
 
     _SparkOverlayManager.trackOverlays(this);
 
-    _enableResizeHandler(opened);
+    if (opened) {
+      _eventSubs.addAll(
+          SparkWidget.addEventHandlers([window.onResize], resizeHandler));
 
-    if (autoClose || modal) {
-      var eventTypes = new Set<String>();
-      if (modal) eventTypes.addAll(_modalEventTypes);
-      if (autoClose) eventTypes.addAll(_autoCloseEventTypes);
-      _enableCaptureHandler(opened, eventTypes);
+      /**
+       * For modal and auto-closing overlays, intercept and block some events
+       * at the [document] level during the event capture phase.
+       */
+      if (autoClose || modal) {
+        final eventStreams = new Set<Stream<Event>>();
+        if (modal) {
+          eventStreams.addAll([
+              document.body.onMouseDown,
+              document.body.onMouseUp,
+              document.body.onClick,
+              document.body.onDoubleClick,
+              document.body.onMouseWheel,
+              document.body.onContextMenu,
+              document.body.onFocus,
+              document.body.onBlur,
+          ]);
+        }
+        if (autoClose) {
+          eventStreams.addAll([
+              document.body.onMouseDown,
+              document.body.onMouseWheel,
+              document.body.onContextMenu,
+          ]);
+        }
+        _eventSubs.addAll(
+            SparkWidget.addEventHandlers(
+                eventStreams, _captureHandler, capture: true));
+      }
+    } else {
+      SparkWidget.removeEventHandlers(_eventSubs);
     }
 
     asyncFire('opened', detail: opened);
-  }
-
-  void _enableResizeHandler(bool enable) {
-    SparkWidget.addRemoveEventHandlers(
-        window, ['resize'], _resizeHandlerInst, enable: enable);
-  }
-
-  void _enableCaptureHandler(bool enable, Iterable<String> eventTypes) {
-    SparkWidget.addRemoveEventHandlers(
-        document, eventTypes, _captureHandlerInst, enable: enable, capture: true);
   }
 
   void _applyFocus() {
@@ -257,6 +242,7 @@ class SparkOverlay extends SparkWidget {
     classes.remove('closing');
     classes.toggle('revealed', opened);
     _applyFocus();
+    asyncFire('transition-complete', detail: {"opened": opened});
   }
 
   void _openedAnimationEnd(AnimationEvent e) {
@@ -285,7 +271,7 @@ class SparkOverlay extends SparkWidget {
   void _tapHandler(MouseEvent e) {
     Element target = e.target;
     if (target != null && target.attributes.containsKey('overlayToggle')) {
-      toggle();
+      hide();
     } else if (_autoCloseTask != null) {
       _autoCloseTask.cancel();
       _autoCloseTask = null;

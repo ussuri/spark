@@ -14,62 +14,187 @@ import 'package:tavern/tavern.dart' as tavern;
 import 'package:yaml/yaml.dart' as yaml;
 
 import 'package_manager.dart';
-import 'pub_properties.dart';
+import '../decorators.dart';
+import '../exception.dart';
 import '../jobs.dart';
+import '../platform_info.dart';
 import '../workspace.dart';
 
 Logger _logger = new Logger('spark.pub');
 
-class PubManager extends PackageManager {
-  PubManager(Workspace workspace) : super(workspace);
+// TODO(ussuri): Make package-private once no longer used outside.
+final PubProperties pubProperties = new PubProperties();
 
-  //
-  // PackageManager abstract interface:
-  //
+class PubProperties extends PackageServiceProperties {
+  String get packageServiceName => 'pub';
+  String get packageSpecFileName => 'pubspec.yaml';
+  String get packagesDirName => 'packages';
+  String get libDirName => 'lib';
+  String get packageRefPrefix => 'package:';
+  // This will get both the "package:foo/bar.dart" variant when used directly
+  // in Dart and the "baz/packages/foo/bar.dart" variant when served over HTTP.
+  RegExp get packageRefPrefixRegexp =>
+    new RegExp(r'^(package:|.*/packages/|packages/)(.*)$');
+
+  void setSelfReference(Project project, String selfReference) =>
+    project.setMetadata('${packageServiceName}SelfReference', selfReference);
+
+  String getSelfReference(Project project) =>
+    project.getMetadata('${packageServiceName}SelfReference');
+}
+
+File findPubspec(Container container) {
+  while (container.parent != null && container is! Workspace) {
+    Resource child = container.getChild(pubProperties.packageSpecFileName);
+    if (child != null) {
+      return child;
+    }
+    container = container.parent;
+  }
+  return null;
+}
+
+class PubManager extends PackageManager {
+  final StreamController<Project> _controller = new StreamController.broadcast();
+
+  /**
+   * Create a new [PubManager] instance. This is a heavy-weight object; it
+   * creates a new [Builder].
+   */
+  PubManager(Workspace workspace) : super(workspace);
 
   PackageServiceProperties get properties => pubProperties;
 
-  PackageBuilder getBuilder() => new _PubBuilder();
+  void setSelfReference(Project project, String selfReference) {
+    properties.setSelfReference(project, selfReference);
+    _controller.add(project);
+  }
 
-  PackageResolver getResolverFor(Project project) => new _PubResolver._(project);
+  Stream<Project> get onSelfReferenceChange => _controller.stream;
 
-  Future installPackages(Container container) =>
-      _installUpgradePackages(container, 'get', false);
+  PackageBuilder getBuilder() => new _PubBuilder(this);
 
-  Future upgradePackages(Container container) =>
-      _installUpgradePackages(container, 'upgrade', true);
+  PackageResolver getResolverFor(Project project) =>
+      new _PubResolver._(this, project);
 
-  //
-  // - end PackageManager abstract interface.
-  //
+  bool canRunPub(Folder project) => pubProperties.isFolderWithPackages(project);
+
+  Future installPackages(Folder container, ProgressMonitor monitor) =>
+      _installUpgradePackages(container, 'get', false, monitor);
+
+  Future upgradePackages(Folder container, ProgressMonitor monitor) =>
+      _installUpgradePackages(container, 'upgrade', true, monitor);
+
+  Future<dynamic> arePackagesInstalled(Folder container) {
+    File pubspecFile = findPubspec(container);
+    if (pubspecFile is File) {
+      container = pubspecFile.parent;
+      return pubspecFile.getContents().then((String str) {
+        try {
+          _PubSpecInfo info = new _PubSpecInfo.parse(str);
+          for (String dep in info.getDependencies()) {
+            Resource dependency =
+                 container.getChildPath('${properties.packagesDirName}/${dep}');
+            if (dependency is! Folder) {
+              return dep;
+            }
+          }
+        } on Exception catch (e) {
+          _logger.info('Error parsing pubspec file', e);
+        }
+      });
+    }
+    return new Future.value();
+  }
 
   Future _installUpgradePackages(
-      Container container, String commandName, bool isUpgrade) {
-    return tavern.getDependencies(container.entry, _handleLog, isUpgrade).
+      Folder container,
+      String commandName,
+      bool isUpgrade,
+      ProgressMonitor monitor) {
+    // Don't run pub on Windows (#2743).
+    if (PlatformInfo.isWin) return new Future.value();
+
+    // Fake the total amount of work, since we don't know it. When an update
+    // comes from Tavern, just refresh the generic message w/o showing progress.
+    monitor.start(
+        "Getting Pub packages…", maxWork: 0, format: ProgressFormat.NONE);
+
+    void handleLog(String line, String level) {
+      _logger.info(line.trim());
+      // Also fake the amount of work done for the same reason.
+      monitor.worked(1);
+    }
+
+    Container projectDir = _getProjectDir(container);
+    return tavern.getDependencies(projectDir.entry, handleLog, isUpgrade).
         whenComplete(() {
       return container.project.refresh();
     }).catchError((e, st) {
-      _logger.severe('Error running pub $commandName', e, st);
+      _logger.severe('Error running Pub $commandName', e, st);
+      if (isSymlinkError(e)) {
+        return new Future.error(new SparkException(
+          SparkErrorMessages.SYMLINKS_ERROR_MSG,
+          errorCode: SparkErrorConstants.SYMLINKS_OPERATION_NOT_SUPPORTED), st);
+      }
       return new Future.error(e, st);
     });
   }
 
-  void _handleLog(String line, String level) {
-    _logger.info(line.trim());
+  Folder _getProjectDir(Folder resource) {
+    Container container = resource;
+    while(container != null) {
+      if (pubProperties.isFolderWithPackages(container)) {
+        return container;
+      }
+      container = container.parent;
+    }
+    return resource;
   }
+}
+
+/**
+ * A decorator to add text decorations to the `pubspec.yaml` file.
+ */
+class PubDecorator extends Decorator {
+  final PubManager _manager;
+  final StreamController _controller = new StreamController.broadcast();
+
+  PubDecorator(this._manager) {
+    _manager.onSelfReferenceChange.listen((_) => _controller.add(null));
+  }
+
+  bool canDecorate(Object object) {
+    if (object is! Resource) return false;
+
+    Resource r = object;
+    return r.isFile && r.name == _manager.properties.packageSpecFileName;
+  }
+
+  String getTextDecoration(Object object) {
+    Resource resource = object;
+    Project project = resource.project;
+    if (project == null) return null;
+    String name = _manager.properties.getSelfReference(project);
+    return name == null ? null : ' - ${name}';
+  }
+
+  Stream get onChanged => _controller.stream;
 }
 
 /**
  * A class to help resolve pub `package:` references.
  */
 class _PubResolver extends PackageResolver {
+  final PubManager manager;
   final Project project;
 
-  _PubResolver._(this.project);
-
-  //
-  // PackageResolver virtual interface:
-  //
+  _PubResolver._(this.manager, this.project) {
+    // We calculate the pubspec.yaml self-reference name as each project is
+    // initially touched / opened. We do this as a workaround for the workspace
+    // meta-data not persisting (#1578).
+    _calcSelfReference();
+  }
 
   PackageServiceProperties get properties => pubProperties;
 
@@ -134,6 +259,21 @@ class _PubResolver extends PackageResolver {
       return null;
     }
   }
+
+  Future _calcSelfReference() {
+    Resource file = project.getChild(properties.packageSpecFileName);
+
+    if (file is! File) return new Future.value();
+
+    return (file as File).getContents().then((String str) {
+      try {
+        _PubSpecInfo info = new _PubSpecInfo.parse(str);
+        manager.setSelfReference(file.project, info.name);
+      } catch (e) { }
+    });
+  }
+
+  String toString() => 'Pub resolver for ${project}';
 }
 
 /**
@@ -143,11 +283,9 @@ class _PubResolver extends PackageResolver {
  * resolving `package:` references.
  */
 class _PubBuilder extends PackageBuilder {
-  _PubBuilder();
+  final PubManager _pubManager;
 
-  //
-  // PackageBuilder virtual interface:
-  //
+  _PubBuilder(this._pubManager);
 
   PackageServiceProperties get properties => pubProperties;
 
@@ -161,7 +299,7 @@ class _PubBuilder extends PackageBuilder {
 
     if (pubspecFile is! File) {
       if (properties.getSelfReference(project) != null) {
-        properties.setSelfReference(project, null);
+        _pubManager.setSelfReference(project, null);
       }
     } else {
       bool analyzePubspec = false;
@@ -189,17 +327,13 @@ class _PubBuilder extends PackageBuilder {
     return new Future.value();
   }
 
-  //
-  // - PackageBuilder virtual interface.
-  //
-
   Future _analyzePubspec(File file) {
     file.clearMarkers(_packageServiceName);
 
     return file.getContents().then((String str) {
       try {
         _PubSpecInfo info = new _PubSpecInfo.parse(str);
-        properties.setSelfReference(file.project, info.name);
+        _pubManager.setSelfReference(file.project, info.name);
         for (String dep in info.getDependencies()) {
           Resource dependency =
               file.project.getChildPath('${_packagesDirName}/${dep}');

@@ -46,7 +46,7 @@ class HttpFetcher {
 
   Future<List<GitRef>> fetchUploadRefs() => _fetchRefs('git-upload-pack');
 
-  Future pushRefs(List<GitRef> refPaths, List<int> packData, progress) {
+  Future pushRefs(List<GitRef> refPaths, List<int> packData, Function progress) {
     Completer completer = new Completer();
     String url = _makeUri('/git-receive-pack', {});
     Blob body = _pushRequest(refPaths, packData);
@@ -91,7 +91,7 @@ class HttpFetcher {
     String body = _refWantRequst(wantRefs, haveRefs, shallow, depth, moreHaves);
     var xhr = getNewHttpRequest();
 
-    //TODO add progress.
+    // TODO: add progress.
     Function packProgress, receiveProgress;
 
     xhr.open("POST", url, async: true , user: username , password: password);
@@ -99,11 +99,10 @@ class HttpFetcher {
     xhr.setRequestHeader('Content-Type', 'application/x-git-upload-pack-request');
 
     xhr.onLoad.listen((event) {
-      ByteBuffer buffer = xhr.response;
-      Uint8List data = new Uint8List.view(buffer, 4, 3);
-      if (haveRefs != null && UTF8.decode(data.toList()) == "NAK") {
+      Uint8List data = _createUint8List(xhr.response);
+      if (haveRefs != null && UTF8.decode(data.sublist(4, 7)) == "NAK") {
         if (moreHaves.isNotEmpty) {
-          //TODO handle case of more haves.
+          // TODO: handle case of more haves.
           //store.getCommitGraph(headShas, COMMIT_LIMIT).then((obj) {
           //});
         } else if (noCommon) {
@@ -111,14 +110,12 @@ class HttpFetcher {
         }
         completer.completeError("error in git pull");
       } else {
-
         if (packProgress != null) {
           packProgress({'pct': 0, 'msg': "Parsing pack data"});
         }
 
-        // TODO add UploadPackParser class.
         UploadPackParser parser = getUploadPackParser(cancel);
-        return parser.parse(buffer, store, packProgress).then(
+        return parser.parse(data, store, packProgress).then(
             (PackParseResult obj) {
            completer.complete(obj);
         }, onError: (e) {
@@ -344,8 +341,8 @@ class HttpFetcher {
 }
 
 class HttpGitException extends GitException {
-  int status;
-  String statusText;
+  final int status;
+  final String statusText;
 
   HttpGitException(this.status, this.statusText, [String errorCode,
       String message, bool canIgnore]) : super(errorCode, message, canIgnore);
@@ -354,15 +351,19 @@ class HttpGitException extends GitException {
     String errorCode;
 
     if (request.status == 401) {
-      errorCode = GitErrorConstants.GIT_AUTH_ERROR;
+      errorCode = GitErrorConstants.GIT_AUTH_REQUIRED;
     } else if (request.status == 404) {
-        errorCode = GitErrorConstants.GIT_HTTP_404_ERROR;
+        errorCode = GitErrorConstants.GIT_HTTP_NOT_FOUND_ERROR;
+    } else if (request.status == 403) {
+      errorCode = GitErrorConstants.GIT_HTTP_FORBIDDEN_ERROR;
+    } else if (request.status == 0) {
+      errorCode = GitErrorConstants.GIT_HTTP_CONN_RESET;
     } else {
       errorCode = GitErrorConstants.GIT_HTTP_ERROR;
     }
 
     return new HttpGitException(request.status, request.statusText, errorCode,
-        "", false);
+        '${request.status} ${request.statusText}');
   }
 
   /**
@@ -371,4 +372,19 @@ class HttpGitException extends GitException {
   bool get needsAuth => status == 401;
 
   String toString() => '${status} ${statusText}';
+}
+
+/**
+ * Expect either a [Uint8List] or a [ByteBuffer]. Return a [Uint8List].
+ */
+Uint8List _createUint8List(dynamic response) {
+  if (response is Uint8List) {
+    return response;
+  }
+
+  if (response is ByteBuffer) {
+    return new Uint8List.view(response);
+  }
+
+  throw 'unexpected type for _createUint8List(): ${response.runtimeType}';
 }

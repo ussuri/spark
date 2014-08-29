@@ -12,8 +12,11 @@ import 'package:chrome/chrome_app.dart' as chrome;
 import 'package:logging/logging.dart';
 import 'package:unittest/unittest.dart' as unittest;
 
-import 'jobs.dart';
+import 'filesystem.dart' as filesystem;
+import 'preferences.dart';
+import 'platform_info.dart';
 import 'tcp.dart' as tcp;
+import 'utils.dart';
 
 const int _DEFAULT_TESTPORT = 5120;
 
@@ -23,16 +26,21 @@ Logger _logger = new Logger('spark.tests');
  * A class used to drive unit tests and report results in a Chrome App setting.
  */
 class TestDriver {
-  final JobManager _jobManager;
-  StreamSubscription _logListener;
-
   Function _defineTestsFn;
+  final Notifier _notifier;
+  final PreferenceStore _prefs;
+
+  StreamSubscription _logListener;
+  StreamController<unittest.TestCase> _onTestFinished =
+      new StreamController.broadcast();
+
   Element _testDiv;
   Element _statusDiv;
 
   Completer<bool> _testCompleter;
 
-  TestDriver(this._defineTestsFn, this._jobManager, {bool connectToTestListener: false}) {
+  TestDriver(this._defineTestsFn, this._notifier, this._prefs,
+      {bool connectToTestListener: false}) {
     unittest.unittestConfiguration = new _SparkTestConfiguration(this);
 
     if (connectToTestListener) {
@@ -44,6 +52,9 @@ class TestDriver {
    * Run the tests and return back whether they passed.
    */
   Future<bool> runTests() {
+    filesystem.setMockFilesystemAccess();
+    filesystem.restoreManager(_notifier, _prefs);
+
     if (_logListener == null) {
       _createTestUI();
     }
@@ -59,10 +70,16 @@ class TestDriver {
       _defineTestsFn = null;
     }
 
-    _TestJob job = new _TestJob(this, _testCompleter);
-    _jobManager.schedule(job);
+    _notifier.showSuccessMessage('Running tests...');
+    unittest.runTests();
 
     return _testCompleter.future;
+  }
+
+  Stream<unittest.TestCase> get onTestFinished => _onTestFinished.stream;
+
+  void testFinished(unittest.TestCase test) {
+    _onTestFinished.add(test);
   }
 
   void _connectToListener() {
@@ -79,8 +96,11 @@ class TestDriver {
             '[${r.level.name}] ${_fixed(r.loggerName, 11)}: ${r.message}');
       });
 
-      _logger.info('Running tests on ${window.navigator.appCodeName} '
-          '${window.navigator.appName} ${window.navigator.appVersion}');
+      _logger.info('Running tests on:');
+      _logger.info('${window.navigator.appCodeName}');
+      _logger.info('${window.navigator.appName}');
+      _logger.info('${window.navigator.appVersion}');
+      _logger.info('Chrome version: ${PlatformInfo.chromeVersion}');
 
       runTests().then((bool success) {
         testClient.log('test exit code: ${(success ? 0 : 1)}');
@@ -109,7 +129,7 @@ class TestDriver {
     _testDiv.nodes.add(_statusDiv);
 
     _logger.onRecord.listen((LogRecord record) {
-      if (record.level > Level.INFO) {
+      if (record.level >= Level.SEVERE) {
         _statusDiv.style.background = 'red';
       }
       _statusDiv.text = record.toString();
@@ -120,21 +140,6 @@ class TestDriver {
 
   void _testsFinished(bool sucess) {
     _testCompleter.complete(sucess);
-  }
-}
-
-class _TestJob extends Job {
-  final TestDriver testDriver;
-  final Completer<bool> testCompleter;
-
-  _TestJob(this.testDriver, this.testCompleter) : super("Running tests…");
-
-  Future<Job> run(ProgressMonitor monitor) {
-    monitor.start(name);
-
-    unittest.runTests();
-
-    return testCompleter.future.then((_) => this);
   }
 }
 
@@ -203,6 +208,8 @@ class _SparkTestConfiguration extends unittest.Configuration {
     } else {
       _logger.info("${test.result} ${test.description}\n");
     }
+
+    testDriver.testFinished(test);
   }
 
   void onSummary(int passed, int failed, int errors,

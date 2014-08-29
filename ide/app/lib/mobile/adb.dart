@@ -350,8 +350,8 @@ class AndroidDevice {
   Future connect(SystemIdentity systemIdentity) {
     return chrome.usb.claimInterface(adbConnectionHandle,
         adbInterface.interfaceNumber).catchError((e) {
-      throw 'Could not open an ADB connection: "${e}".\n Please check whether '
-          'the Chrome ADT application is running on the Android device. \n'
+      throw 'Could not open an ADB connection: "${e}".\n Please check whether the'
+          'App Dev Tool application is running on the Android device. \n'
           'Additionally, DevTools may not have released the USB connection. To '
           'check this go to chrome://inspect, Devices, uncheck \'Discover USB '
           'devices\', then disconnect and re-connect your phone from USB.';
@@ -542,8 +542,10 @@ class AndroidDevice {
       if (msg.command == AdbUtil.A_OKAY) {
         return msg.arg0;
       } else {
-        return new Future.error('Expected an OKAY but got: ${msg.toString()}.\n' +
-            'Please check that you are running Chrome ADT on your mobile device.');
+        return new Future.error(
+            'Expected an OKAY but got an unexpected response.\n'
+            'Please check that you are running the App Dev Tool '
+            'on your mobile device.');
       }
     });
   }
@@ -553,7 +555,7 @@ class AndroidDevice {
   // response, headers and all. In case of an error, rejects the Future with an
   // error message.
   // Technically this will work for sending any TCP request/response pair.
-  Future<List<int>> sendHttpRequest(List<int> httpRequest, int port) {
+  Future<List<int>> sendHttpRequest(List<int> httpRequest, int port, Duration timeout) {
     int localID = 4; // Arbitrary choice.
     int remoteID;
     Queue<ByteData> responseChunks;
@@ -564,8 +566,8 @@ class AndroidDevice {
       // If we caught an error here, we probably got a CLSE instead.
       // This means the remote end isn't listening to our port.
       _logger.severe('Error sending adb message', e);
-      return new Future.error('Connection on port $port refused.\n' +
-          'Please check whether Chrome ADT is running on your mobile device.');
+      return new Future.error('Connection on port $port refused.\nPlease check '
+          'whether the App Dev Tool is running on your mobile device.');
     }).then((_) { return awaitOkay(); }).then((remoteID_) {
       remoteID = remoteID_;
 
@@ -603,12 +605,12 @@ class AndroidDevice {
       responseChunks = new Queue<ByteData>();
 
       Future readChunk() {
-        return receive().timeout(new Duration(milliseconds: 800)).then((msg) {
+        return receive().timeout(timeout).then((msg) {
           if (msg.command == AdbUtil.A_WRTE) {
             responseChunks.add(msg.dataBuffer);
             return sendMessage(new AdbMessage(AdbUtil.A_OKAY, localID,
                 remoteID)).then((_) { return readChunk(); });
-          } else {
+          } else if (msg.command != AdbUtil.A_CLSE) {
             return new Future.error('Unexpected message from device.');
           }
         }).catchError((e) {
