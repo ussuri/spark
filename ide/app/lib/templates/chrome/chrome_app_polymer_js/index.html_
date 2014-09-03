@@ -4,6 +4,9 @@
 <head>
   <title>``projectName``</title>
 
+  <meta http-equiv="Content-Security-Policy" content="style-src 'unsafe-inline' fonts.googleapis.com">
+
+
   <script src="bower_components/platform/platform.js"></script>
 
   <link rel="import" href="bower_components/core-icons/core-icons.html">
