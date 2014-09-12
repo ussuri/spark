@@ -554,7 +554,8 @@ abstract class Spark
     actionManager.registerAction(new ImportFolderAction(this,
         getDialogElement('#statusDialog')));
     actionManager.registerAction(new FileDeleteAction(this));
-    actionManager.registerAction(new ProjectRemoveAction(this));
+    actionManager.registerAction(new ProjectRemoveAction(this,
+        getDialogElement('#projectRemoveDialog')));
     actionManager.registerAction(new TopLevelFileRemoveAction(this));
     actionManager.registerAction(new PropertiesAction(this,
         getDialogElement("#propertiesDialog")));
@@ -1467,7 +1468,7 @@ class FileDeleteAction extends SparkAction implements ContextAction {
     }
 
     String ordinality = (resources.length == 1) ?
-        '${resources.first.name}' : '${resources.length} files/folders';
+        '"${resources.first.name}"' : '${resources.length} files/folders';
     String message =
         "Do you really want to delete $ordinality?\n"
         "This will permanently delete the files from disk and cannot be undone.";
@@ -1492,54 +1493,55 @@ class FileDeleteAction extends SparkAction implements ContextAction {
       !_hasTopLevelResource(object);
 }
 
-// TODO(ussuri): Convert to SparkActionWithDialog.
-class ProjectRemoveAction extends SparkAction implements ContextAction {
-  ProjectRemoveAction(Spark spark) : super(spark, "project-remove", "Delete…");
+class ProjectRemoveAction
+    extends SparkActionWithDialog implements ContextAction {
+  ws.Project _project;
 
-  void _invoke([List<ws.Resource> resources]) {
-    ws.Project project = resources.first;
-    // If project is on sync filesystem, it can only be deleted.
-    // It can't be unlinked.
-    if (project.isSyncResource()) {
-      _deleteProject(project);
-      return;
-    }
-
-    Dialog _dialog =
-        spark.createDialog(spark.getDialogElement('#projectRemoveDialog'));
-    _dialog.getElement("#projectRemoveProjectName").text =
-        project.name;
+  ProjectRemoveAction(Spark spark, Element dialog)
+      : super(spark, "project-remove", "Delete/Remove…", dialog) {
     _dialog.getElement("#projectRemoveDeleteButton")
-        .onClick.listen((_) => _deleteProject(project));
+        .onClick.listen((_) => _deleteProject());
     _dialog.getElement("#projectRemoveRemoveReferenceButton")
-        .onClick.listen((_) => _removeProjectReference(project));
-    _dialog.show();
+        .onClick.listen((_) => _removeProjectReference());
   }
 
-  void _deleteProject(ws.Project project) {
+  void _invoke([List<ws.Resource> resources]) {
+    _project = resources.first;
+    _dialog.getElement("#projectRemoveProjectName").text =
+        _project.name;
+    // If project is on sync filesystem, it can only be deleted.
+    // It can't be unlinked.
+    if (_project.isSyncResource()) {
+      _deleteProject();
+      return;
+    }
+    _show();
+  }
+
+  void _deleteProject() {
     spark.askUserOkCancel(
-        'Do you really want to delete "${project.name}"?\n'
+        'Do you really want to delete "${_project.name}"?\n'
         'This will permanently delete the project contents from disk '
         'and cannot be undone.',
         okButtonLabel: 'Delete',
         title: 'Delete Project from Disk').then((bool val) {
       if (val) {
         // TODO(grv): scmManger should listen to the delete project event.
-        spark.scmManager.removeProject(project);
-        project.delete().catchError((e) {
+        spark.scmManager.removeProject(_project);
+        _project.delete().catchError((e) {
           spark.showErrorMessage("Error while deleting project", exception: e);
         });
       }
     });
   }
 
-  void _removeProjectReference(ws.Project project) {
-    spark.workspace.unlink(project);
+  void _removeProjectReference() {
+    spark.workspace.unlink(_project);
   }
 
   String get category => 'resource';
 
-  bool appliesTo(Object object) => _isProject(object);
+  bool appliesTo(context) => _isProject(context);
 }
 
 // TODO(ussuri): 1) Convert to SparkActionWithDialog. 2) This dialog is almost
@@ -1563,10 +1565,11 @@ class TopLevelFileRemoveAction extends SparkAction implements ContextAction {
   }
 
   void _deleteFile(ws.File file) {
-    spark.askUserOkCancel('''
-Do you really want to delete "${file.name}"?
-This will permanently delete the file from disk and cannot be undone.
-''', okButtonLabel: 'Delete', title: 'Delete File from Disk').then((bool val) {
+    spark.askUserOkCancel(
+        'Do you really want to delete "${file.name}"?\n'
+        'This will permanently delete the file from disk and cannot be undone.',
+        okButtonLabel: 'Delete',
+        title: 'Delete File from Disk').then((bool val) {
       if (val) {
         file.delete().catchError((e) {
           spark.showErrorMessage("Error while deleting file", exception: e);
