@@ -345,22 +345,6 @@ class SparkPolymer extends Spark {
   }
 
   @override
-  void unveil() {
-    super.unveil();
-
-    // TODO(devoncarew) We'll want to switch over to using the polymer
-    // 'unresolved' or 'polymer-unveil' attributes, once these start working.
-    DivElement element = document.querySelector('#splashScreen');
-
-    if (element != null) {
-      element.classes.add('closeSplash');
-      new Timer(new Duration(milliseconds: 300), () {
-        element.parent.children.remove(element);
-      });
-    }
-  }
-
-  @override
   void refreshUI() {
     _ui.refreshFromModel();
   }

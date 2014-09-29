@@ -38,7 +38,7 @@
   <script src="third_party/jshint/jshint.js"></script>
 </head>
 
-<body>
+<body unresolved>
   <!-- Template for FileItemCell -->
   <template id="fileview-filename-template" >
     <div class="fileview-filename-container">
@@ -75,13 +75,17 @@
     </div>
   </template>
 
+  <div id="test">
+    TEST TEST TEST TEST TEST
+  </div>
+
   <!-- Splash screen. -->
   <div id="splashScreen">
     <div id="splashScreenProgress"></div>
   </div>
 
   <!-- Top-level UI element. -->
-  <spark-polymer-ui id="topUi">
+  <spark-polymer-ui id="topUi" unresolved>
     <div id="leftPanel" tabindex="0" beforeSplit>
       <div id="fileViewArea"></div>
       <div id="fileViewFilterNoResult" class="hidden">
