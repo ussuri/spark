@@ -19,11 +19,13 @@ import 'package:logging/logging.dart';
 
 import 'apps/app_utils.dart';
 import 'developer_private.dart';
+import 'dependency.dart';
 import 'enum.dart';
 import 'exception.dart';
 import 'jobs.dart';
 import 'package_mgmt/package_manager.dart';
 import 'package_mgmt/pub.dart';
+import 'package_mgmt/pub_properties.dart';
 import 'platform_info.dart';
 import 'services.dart';
 import 'utils.dart';
@@ -261,8 +263,9 @@ abstract class ApplicationLocator {
 
   bool _isDartApp(Resource resource) {
     Container container = resource is Container ? resource : resource.parent;
-    bool result = findPubspec(container) != null ? true : false;
-    return result;
+    File specFile =
+        Dependencies.dependency[PubManager].properties.findSpecFile(container);
+    return specFile != null;
   }
 }
 

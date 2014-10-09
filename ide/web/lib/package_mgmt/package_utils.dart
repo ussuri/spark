@@ -2,10 +2,10 @@
 // All rights reserved. Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-library spark.package_utils;
+library spark.package_mgmt.utils;
 
 import 'bower_properties.dart';
-import 'pub.dart';
+import 'pub_properties.dart';
 import '../workspace.dart';
 
 /**
@@ -14,5 +14,5 @@ import '../workspace.dart';
  */
 bool isInPackagesFolder(Resource resource) {
   return pubProperties.isInPackagesFolder(resource) ||
-      bowerProperties.isInPackagesFolder(resource);
+         bowerProperties.isInPackagesFolder(resource);
 }

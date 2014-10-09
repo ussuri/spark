@@ -40,6 +40,7 @@ import 'lib/launch.dart';
 import 'lib/mobile/android_rsa.dart';
 import 'lib/mobile/deploy.dart';
 import 'lib/navigation.dart';
+import 'lib/package_mgmt/package_manager.dart';
 import 'lib/package_mgmt/pub.dart';
 import 'lib/package_mgmt/bower.dart';
 import 'lib/platform_info.dart';
@@ -375,10 +376,12 @@ abstract class Spark
     // Init the Pub manager, and add it to the dependencies tracker.
     PubManager pubManager = new PubManager(workspace);
     dependencies[PubManager] = pubManager;
-    decoratorManager.addDecorator(new PubDecorator(pubManager));
+    decoratorManager.addDecorator(new PackageDecorator(pubManager));
 
     // Init the Bower manager, and add it to the dependencies tracker.
-    dependencies[BowerManager] = new BowerManager(workspace);
+    BowerManager bowerManager = new BowerManager(workspace);
+    dependencies[BowerManager] = bowerManager;
+    decoratorManager.addDecorator(new PackageDecorator(bowerManager));
   }
 
   void initAceManager() {

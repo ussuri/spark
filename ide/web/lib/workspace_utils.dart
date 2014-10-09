@@ -14,6 +14,7 @@ import 'dependency.dart';
 import 'package_mgmt/bower.dart';
 import 'package_mgmt/bower_properties.dart';
 import 'package_mgmt/pub.dart';
+import 'package_mgmt/pub_properties.dart';
 import 'workspace.dart';
 
 Future archiveContainer(Container container, [bool addZipManifest = false]) {

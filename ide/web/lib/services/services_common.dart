@@ -11,6 +11,7 @@ import 'package:logging/logging.dart';
 import '../workspace.dart';
 import '../package_mgmt/package_manager.dart';
 import '../package_mgmt/pub.dart';
+import '../package_mgmt/pub_properties.dart';
 
 final Logger _logger = new Logger('spark.services_common');
 

@@ -21,7 +21,7 @@ import 'editors.dart';
 import 'markdown.dart';
 import 'navigation.dart';
 import 'package_mgmt/bower_properties.dart';
-import 'package_mgmt/pub.dart';
+import 'package_mgmt/pub_properties.dart';
 import 'platform_info.dart';
 import 'preferences.dart';
 import 'utils.dart' as utils;

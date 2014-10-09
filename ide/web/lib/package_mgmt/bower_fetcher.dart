@@ -17,6 +17,7 @@ import 'package:archive/archive.dart' as arc;
 import 'package:chrome/chrome_app.dart' as chrome;
 import 'package:logging/logging.dart';
 
+import 'package_common.dart';
 import '../enum.dart';
 import '../jobs.dart';
 import '../scm.dart';
@@ -24,15 +25,6 @@ import '../spark_flags.dart';
 import '../utils.dart' as util;
 
 final Logger _logger = new Logger('spark.bower_fetcher');
-
-class FetchMode extends Enum<String> {
-  const FetchMode._(String val) : super(val);
-
-  String get enumName => 'FetchMode';
-
-  static const INSTALL = const FetchMode._('INSTALL');
-  static const UPGRADE = const FetchMode._('UPGRADE');
-}
 
 class _PrepareDirRes {
   chrome.DirectoryEntry entry;

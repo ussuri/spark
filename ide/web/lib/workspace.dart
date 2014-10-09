@@ -540,6 +540,7 @@ class Workspace extends Container {
 abstract class Container extends Resource {
   Container(Container parent, chrome.Entry entry) : super(parent, entry);
 
+  // TODO(ussuri): Maybe merge [getChild] and [getChildPath] into one?
   Resource getChild(String name) {
     return getChildren().firstWhere((c) => c.name == name, orElse: () => null);
   }
@@ -566,6 +567,8 @@ abstract class Container extends Resource {
   }
 
   List<Resource> getChildren();
+
+  Resource getSibling(String path) => parent.getChildPath(path);
 
   List<Marker> getMarkers() {
     return traverse().where((r) => r is File)

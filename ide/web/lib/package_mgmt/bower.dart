@@ -16,6 +16,7 @@ import 'package:logging/logging.dart';
 
 import 'bower_fetcher.dart';
 import 'bower_properties.dart';
+import 'package_common.dart';
 import 'package_manager.dart';
 import '../jobs.dart';
 import '../workspace.dart';
@@ -40,19 +41,9 @@ class BowerManager extends PackageManager {
   PackageResolver getResolverFor(Project project) =>
       new _BowerResolver._(project);
 
-  Future installPackages(Folder container, ProgressMonitor monitor) =>
-      _installOrUpgradePackages(container.project, FetchMode.INSTALL, monitor);
-
-  Future upgradePackages(Folder container, ProgressMonitor monitor) =>
-      _installOrUpgradePackages(container.project, FetchMode.UPGRADE, monitor);
-
   // TODO(keertip): implement for bower
   Future<dynamic> arePackagesInstalled(Folder container) =>
       new Future.value(true);
-
-  //
-  // - end PackageManager abstract interface.
-  //
 
   Future _installOrUpgradePackages(
       Folder container, FetchMode mode, ProgressMonitor monitor) {
@@ -79,6 +70,10 @@ class BowerManager extends PackageManager {
       });
     });
   }
+
+  //
+  // - end PackageManager abstract interface.
+  //
 }
 
 /**
