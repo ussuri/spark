@@ -34,7 +34,7 @@ webview {
   /* The Designer loads in a jittery fashion, especially given that we feed
      a design's code into it mid-flight. Mask that via an animation. */
   -webkit-animation-name: reveal;
-  -webkit-animation-duration: 3s;
+  -webkit-animation-duration: 1s;
 }
 
 @-webkit-keyframes reveal {

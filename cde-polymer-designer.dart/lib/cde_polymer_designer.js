@@ -26,14 +26,6 @@ PromiseCompleter.prototype.catch = function(onRejected) {
 }
 
 Polymer('cde-polymer-designer', {
-  // NOTE: Make sure this is in-sync with ide/web/manifest.json.
-  STORAGE_PARTITION_: 'persist:cde-polymer-designer',
-  // NOTE: We must use the full path as viewed by a client app.
-  LOCAL_ENTRY_POINT_:
-      'packages/cde_polymer_designer/src/polymer_designer/index.html',
-  ONLINE_ENTRY_POINT_:
-      'https://www.polymer-project.org/tools/designer/',
-
   /**
    * Specifies whether to use the local, compiled-in copy of Polymer Designer
    * or the online one.
@@ -42,11 +34,6 @@ Polymer('cde-polymer-designer', {
    * @type string
    */
   entryPoint: 'local',
-
-  /**
-   * Initial design code requested in a call to [load].
-   */
-  initialCode_: '',
 
   /**
    * The dynamically created <webview> element.
@@ -75,55 +62,22 @@ Polymer('cde-polymer-designer', {
    */
   ready: function() {
     this.registerDesignerProxyListener_();
-  },
-
-  /**
-   * Initializes this object from an idle state:
-   * - Creates a new <webview>.
-   * - Inserts it into the shadow DOM.
-   * - Navigates it to the Polymer Designer local or online entry point.
-   *
-   * @return: Promise
-   */
-  load: function(initialCode) {
-    if (this.webviewReadyCompleter_ !== null) {
-      throw "Already loaded or still loading: call unload() first";
-    }
-
-    this.initialCode_ = initialCode;
 
     // This will be completed in [onWebviewContentLoad_].
     this.webviewReadyCompleter_ = new PromiseCompleter();
 
-    this.webview_ = document.createElement('webview');
+    this.webview_ = this.$['webview'];
     this.webview_.addEventListener(
         'contentload', this.onWebviewContentLoad_.bind(this));
-    this.webview_.partition = this.STORAGE_PARTITION_;
-    this.webview_.src =
-        this.entryPoint === 'local' ?
-        this.LOCAL_ENTRY_POINT_ :
-        this.ONLINE_ENTRY_POINT_;
-    this.shadowRoot.appendChild(this.webview_);
-
-    return this.webviewReadyCompleter_.promise;
   },
 
   /**
-   * Returns the object to the idle state:
-   * - terminates the running <webview>, if any.
-   * - removes the <webview> element from the shadow DOM.
-   * - Resets the [Completer]s.
+   * Initializes this object from an idle state.
    *
-   * @return: void
+   * @return: Promise
    */
-  unload: function() {
-    if (this.webview_ != null) {
-      this.webview_.terminate();
-      this.shadowRoot.removeChild(this.webview_);
-    }
-    this.webview_ = null;
-    this.webviewReadyCompleter_ = null;
-    this.getCodeCompleter_ = null;
+  load: function() {
+    return this.webviewReadyCompleter_.promise;
   },
 
   /**
@@ -200,10 +154,10 @@ Polymer('cde-polymer-designer', {
    * @return: void
    */
   onWebviewContentLoad_: function(event) {
-    // Nudge Chrome to redo the layout of the Designer. Without this, or some
-    // other trigger, the Designer never settles to fit the viewport perfectly
-    // (overflows to the right). See http://stackoverflow.com/questions/3485365/.
-    this.webview_.style.width = '100%';
+    // // Nudge Chrome to redo the layout of the Designer. Without this, or some
+    // // other trigger, the Designer never settles to fit the viewport perfectly
+    // // (overflows to the right). See http://stackoverflow.com/questions/3485365/.
+    // this.webview_.style.width = '100%';
     this.tweakDesignerUI_();
     this.injectDesignerProxy_().then(function() {
       this.webviewReadyCompleter_.resolve();
@@ -318,21 +272,8 @@ Polymer('cde-polymer-designer', {
    *
    * @return: string
    */
-  designerProxy_: function(initialCode) {
+  designerProxy_: function() {
     var designer = document.querySelector('#designer');
-
-    // `designer-ready` is fired when the contained designer-frame becomes
-    // ready, but before the designer-element loads the elements from the
-    // palette (specified in [metadata]) and possibly some design from the user.
-    // Handle it in the capture phase to get ahead of designer-element's handler.
-    designer.$.frame.contentWindow.addEventListener('designer-ready',
-        function(event) {
-      // Prest the design code to be loaded by the Designer while the event is
-      // on the way to it. Setting [firstLoad] is a required hack.
-      designer.pendingHtml = initialCode;
-      designer.firstLoad = false;
-    }, /*useCapture=*/true);
-
     // This will receive events sent by the main code via window.postMessage
     // executed inside [webview_]'s DOM.
     window.addEventListener('message', function(event) {
@@ -351,7 +292,7 @@ Polymer('cde-polymer-designer', {
           designer.loadHtml(event.data.code);
           break;
         case 'revert_code':
-          designer.loadHtml(initialCode);
+          designer.loadHtml();
           breal;
         default:
           throw "Unsupported request from client";
@@ -368,8 +309,7 @@ Polymer('cde-polymer-designer', {
    * @return: Promise
    */
   injectDesignerProxy_: function() {
-    return this.injectScriptIntoWebviewMainWorld_(
-        this.designerProxy_, this.initialCode_);
+    return this.injectScriptIntoWebviewMainWorld_(this.designerProxy_);
   },
 
   /**

@@ -4300,7 +4300,7 @@ class PolymerDesignerAction
       _editor = editor;
       _editor.save().then((_) {
         file.getContents().then((String code) {
-          _designer.callMethod('load', [code]);
+          _designer.callMethod('setCode', [code]);
         });
       });
     });
@@ -4312,14 +4312,12 @@ class PolymerDesignerAction
       // Set the new code via [_editor], not [_file] to ensure that the old
       // code is recoverable via undo.
       _editor.replaceContents(code);
-      _cleanup();
     }]);
 
     super._commit();
   }
 
   void _cancel() {
-    _cleanup();
     super._cancel();
   }
 
@@ -4329,11 +4327,6 @@ class PolymerDesignerAction
 
   void _clearDesign([_]) {
     _designer.callMethod('setCode', ['']);
-  }
-
-  void _cleanup() {
-    _designer.callMethod('unload');
-    _file = null;
   }
 
   String get category => 'refactor';
