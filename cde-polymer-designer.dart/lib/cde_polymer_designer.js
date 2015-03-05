@@ -72,25 +72,6 @@ Polymer('cde-polymer-designer', {
   },
 
   /**
-   * Initializes this object from an idle state.
-   *
-   * @return: Promise
-   */
-  load: function() {
-    return this.webviewReadyCompleter_.promise;
-  },
-
-  /**
-   * Reinitializes the object from a running state.
-   *
-   * @return: Promise
-   */
-  reload: function() {
-    this.unload();
-    return this.load();
-  },
-
-  /**
    * Sets the internal design code inside the Designer. This results in PD
    * (re-)rendering the design, if it can parse the code. If it can't, it
    * resets the design to an empty one.
@@ -110,17 +91,6 @@ Polymer('cde-polymer-designer', {
         "}, '*'); }"
       );
     }.bind(this));
-  },
-
-  /**
-   * Resets the internal design code to the value originally requested in [load].
-   *
-   * @return: Promise
-   */
-  revertCode: function() {
-      return this.executeScriptInWebview_(
-        "function() { window.postMessage({action: 'revert_code'}, '*'); }"
-      );
   },
 
   /**
@@ -290,9 +260,6 @@ Polymer('cde-polymer-designer', {
           // doesn't match the expected format: there should be a
           // <polymer-element> tag at the top level.
           designer.loadHtml(event.data.code);
-          break;
-        case 'revert_code':
-          designer.loadHtml();
           break;
         default:
           throw "Unsupported request from client";

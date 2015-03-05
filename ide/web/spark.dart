@@ -4224,10 +4224,9 @@ class PolymerDesignerAction
     _designer = new js.JsObject.fromBrowserObject(
         _dialog.getElement('#polymerDesigner'));
     _dialog.getElement('#polymerDesignerClear').onClick.listen(_clearDesign);
-    _dialog.getElement('#polymerDesignerRevert').onClick.listen(_revertDesign);
-
+    _dialog.getElement('#polymerDesignerRevert').onClick.listen(_initDesign);
     spark.getUIElement('#openPolymerDesignerButton').onClick.listen((_) {
-      _open(spark.editorManager.currentFile);
+      _open();
     });
   }
 
@@ -4235,19 +4234,19 @@ class PolymerDesignerAction
     _open(spark._getFile(resources));
   }
 
-  void _open(File file) {
+  void _open() {
+    _file = spark.editorManager.currentFile;
+
     // Open dialog before reading file to start showing PD's splash.
-    _dialog.dialog.headerTitle = "Polymer Designer: ${file.name}";
+    _dialog.dialog.headerTitle = "Polymer Designer: ${_file.name}";
     _show();
 
     // Activate existing or open a new editor. The latter gives visibility of
     // changes and a way to recover the old code after exporting from PD.
-    spark.openEditor(file).then((editor) {
+    spark.openEditor(_file).then((editor) {
       _editor = editor;
       _editor.save().then((_) {
-        file.getContents().then((String code) {
-          _designer.callMethod('setCode', [code]);
-        });
+        _initDesign();
       });
     });
   }
@@ -4267,8 +4266,10 @@ class PolymerDesignerAction
     super._cancel();
   }
 
-  void _revertDesign([_]) {
-    _designer.callMethod('revertCode');
+  void _initDesign([_]) {
+    _file.getContents().then((String code) {
+      _designer.callMethod('setCode', [code]);
+    });
   }
 
   void _clearDesign([_]) {
