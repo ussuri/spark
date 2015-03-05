@@ -32,7 +32,6 @@ import 'lib/decorators.dart';
 import 'lib/dart/dart_builder.dart';
 import 'lib/editors.dart';
 import 'lib/editor_area.dart';
-import 'lib/editor_config.dart';
 import 'lib/event_bus.dart';
 import 'lib/exception.dart';
 import 'lib/files_mock.dart';
@@ -45,6 +44,7 @@ import 'lib/mobile/android_rsa.dart';
 import 'lib/mobile/deploy.dart';
 import 'lib/mobile/usb.dart';
 import 'lib/navigation.dart';
+import 'lib/package_mgmt/package_manager.dart';
 import 'lib/package_mgmt/pub.dart';
 import 'lib/package_mgmt/bower.dart';
 import 'lib/platform_info.dart';
@@ -165,7 +165,6 @@ abstract class Spark
           initLaunchManager();
           initBuilders();
 
-          initEditorArea();
           initToolbar();
           buildMenu();
           initSplitView();
@@ -266,11 +265,7 @@ abstract class Spark
    * is overwritten in SparkPolymer, which encapsulates the UI in a top-level
    * Polymer widget, rather than the top-level document's DOM.
    */
-  Element getUIElement(String selectors) {
-    final Element elt = document.querySelector(selectors);
-    assert(elt != null);
-    return elt;
-  }
+  Element getUIElement(String selectors);
 
   /**
    * Should extract a dialog Element from the underlying UI's DOM. This is
@@ -426,12 +421,18 @@ abstract class Spark
     _editorManager = new EditorManager(
         workspace, aceManager, prefs, eventBus, services);
 
+    _editorArea = new EditorArea(getUIElement('#editorArea'), editorManager,
+        workspace, allowsLabelBar: true);
+
     editorManager.loaded.then((_) {
       List<ws.Resource> files = editorManager.files.toList();
       editorManager.files.forEach((file) {
         editorArea.selectFile(file, forceOpen: true, switchesTab: false,
             replaceCurrent: false);
       });
+
+      editorManager.setupOutline(getUIElement('#outlineContainer'));
+
       localPrefs.getValue('lastFileSelection').then((String fileUuid) {
         if (editorArea.tabs.isEmpty) return;
 
@@ -449,14 +450,8 @@ abstract class Spark
         _openFile(resource);
       });
     });
-  }
 
-  void initEditorArea() {
-    _editorArea = new EditorArea(querySelector('#editorArea'), editorManager,
-        workspace, allowsLabelBar: true);
-    editorManager.setupOutline(querySelector('#outlineContainer'));
-
-    _editorArea.onSelected.listen((EditorTab tab) {
+    editorArea.onSelected.listen((EditorTab tab) {
       // We don't change the selection when the file was already selected
       // otherwise, it would break multi-selection (#260).
       if (!_filesController.isFileSelected(tab.file)) {
@@ -469,9 +464,13 @@ abstract class Spark
 
   void initFilesController() {
     _filesController = new FilesController(
-        workspace, actionManager, scmManager, eventBus,
-        querySelector('#file-item-context-menu'),
-        querySelector('#fileViewArea'));
+        workspace,
+        actionManager,
+        scmManager,
+        eventBus,
+        getUIElement('#splitView'),
+        getUIElement('#file-item-context-menu'),
+        getUIElement('#fileViewArea'));
     _filesController.visibility = true;
     eventBus.onEvent(BusEventType.FILES_CONTROLLER__SELECTION_CHANGED)
         .listen((FilesControllerSelectionChangedEvent event) {
@@ -484,16 +483,18 @@ abstract class Spark
         .listen((FilesControllerPersistTabEvent event) {
       editorArea.persistTab(event.file);
     });
-    querySelector('#showFileViewButton').onClick.listen((_) {
+    getUIElement('#showFileViewButton').onClick.listen((_) {
       Action action = actionManager.getAction('show-files-view');
       action.invoke();
     });
   }
 
   void initSearchController() {
-    _searchViewController =
-        new SearchViewController(workspace, querySelector('#searchViewArea'));
-    _searchViewController.delegate = this;
+    _searchViewController = new SearchViewController(
+        workspace,
+        getUIElement('#leftPanel'),
+        getUIElement('#sparkStatus'),
+        this);
   }
 
   void initSplitView() {
@@ -1050,8 +1051,8 @@ abstract class Spark
   // TODO(ussuri): Polymerize.
   void setSearchViewVisible(bool visible) {
     InputElement searchField = getUIElement('#fileFilter');
-    querySelector('#searchViewArea').classes.toggle('hidden', !visible);
-    querySelector('#fileViewArea').classes.toggle('hidden', visible);
+    getUIElement('#searchViewArea').classes.toggle('hidden', !visible);
+    getUIElement('#fileViewArea').classes.toggle('hidden', visible);
     searchField.placeholder =
         visible ? 'Search in Files' : 'Filter';
     getUIElement('#showSearchView').attributes['checkmark'] =
@@ -1062,7 +1063,7 @@ abstract class Spark
     _filesController.visibility = !visible;
     _reallyFilterFilesList(searchField.value);
     if (!visible) {
-      querySelector('#searchViewPlaceholder').classes.add('hidden');
+      getUIElement('#searchViewPlaceholder').classes.add('hidden');
     }
   }
 
@@ -1543,7 +1544,7 @@ class FileDeleteAction extends SparkAction implements ContextAction {
 
 // TODO(ussuri): Convert to SparkActionWithDialog.
 class ProjectRemoveAction extends SparkAction implements ContextAction {
-  ProjectRemoveAction(Spark spark) : super(spark, "project-remove", "Delete…");
+  ProjectRemoveAction(Spark spark) : super(spark, "project-remove", "Delete/Remove…");
 
   void _invoke([List<ws.Resource> resources]) {
     ws.Project project = resources.first;
@@ -1860,58 +1861,34 @@ abstract class PackageManagementAction
       super(spark, id, name);
 
   void _invoke([context]) {
-    if (!_canRunAction()) {
-      return;
-    }
-    ws.Resource resource;
+    // NOTE: [appliesTo] ensures this is always valid.
+    final ws.Resource resource = context.single;
+    // [appliesTo] uses [isPackageResource], which guarantees that the below
+    // will return a non-null.
+    final ws.Folder folder =
+        _serviceProperties.getMatchingFolderWithPackages(resource);
+    assert(folder != null);
 
-    if (context == null) {
-      resource = spark.focusManager.currentResource;
-    } else {
-      // NOTE: [appliesTo] should ensure that this is the right choice.
-      resource = context.first;
-    }
-
-    // [appliesTo] delegates to [PackageServiceProperties.isPackageResource],
-    // which is expected to return true if:
-    // - the resourse is a folder that contains a package spec file: this is our
-    //   target, a "package dir" by definition.
-    // - the resource is a package spec file itself: our target is its parent,
-    //   which would fall into the case above if the user clicked on it instead.
-    if (resource is ws.File) {
-      resource = resource.parent;
-    }
-
-    spark.jobManager.schedule(_createJob(resource as ws.Folder)).then((status) {
+    spark.jobManager.schedule(_createJob(folder)).then((status) {
       // TODO(grv): Take action on the returned status.
     });
   }
 
   String get category => 'application';
 
-  bool appliesTo(List list) => list.length == 1 && _appliesTo(list.first);
+  bool appliesTo(List list) =>
+      list.length == 1 && _serviceProperties.isPackageResource(list.first);
 
-  bool _appliesTo(ws.Resource resource);
+  PackageServiceProperties get _serviceProperties;
 
   Job _createJob(ws.Container container);
-
-  bool _canRunAction() => true;
 }
 
 abstract class PubAction extends PackageManagementAction {
   PubAction(Spark spark, String id, String name) : super(spark, id, name);
 
-  bool _canRunAction() {
-    if (PlatformInfo.isWin) {
-      throw new SparkException(
-          SparkErrorMessages.PUB_ON_WINDOWS_MSG,
-          errorCode: SparkErrorConstants.PUB_ON_WINDOWS_NOT_SUPPORTED);
-    }
-    return true;
-  }
-
-  bool _appliesTo(ws.Resource resource) =>
-      spark.pubManager.properties.isPackageResource(resource);
+  PackageServiceProperties get _serviceProperties =>
+      spark.pubManager.properties;
 }
 
 class PubGetAction extends PubAction {
@@ -1929,8 +1906,8 @@ class PubUpgradeAction extends PubAction {
 abstract class BowerAction extends PackageManagementAction {
   BowerAction(Spark spark, String id, String name) : super(spark, id, name);
 
-  bool _appliesTo(ws.Resource resource) =>
-      spark.bowerManager.properties.isPackageResource(resource);
+  PackageServiceProperties get _serviceProperties =>
+      spark.bowerManager.properties;
 }
 
 class BowerGetAction extends BowerAction {
@@ -1961,7 +1938,7 @@ class CspFixAction extends SparkAction implements ContextAction {
     });
   }
 
-  String get category => 'refactor';
+  String get category => 'source_manipulation';
 
   bool appliesTo(List list) => CspFixer.mightProcess(list);
 }
@@ -2241,16 +2218,7 @@ class BuildApkAction extends SparkActionWithDialog {
 
 class NewProjectAction extends SparkActionWithDialog {
   InputElement _nameElt;
-
-  // TODO(ussuri): Eliminate this and dependencies as per BUG #3619.
-  static const _KNOWN_JS_PACKAGES = const {
-      'polymer': 'Polymer/polymer#master',
-      'core-elements': 'Polymer/core-elements#master',
-      'paper-elements': 'Polymer/paper-elements#master'
-  };
-  // Matches: "proj-template", "proj-template;polymer,core-elements".
-  // TODO(ussuri): Set to '([\/\w_-]+)' when fixing BUG #3619.
-  static final _TEMPLATE_REGEX = new RegExp(r'([\/\w_-]+)(;(([\w-],?)+))?');
+  SelectElement get _typeElt => getElement('select[name="type"]');
 
   NewProjectAction(Spark spark, Element dialog)
       : super(spark, "project-new", "New Project…", dialog) {
@@ -2282,7 +2250,7 @@ class NewProjectAction extends SparkActionWithDialog {
       }
 
       ws.WorkspaceRoot root = filesystem.fileSystemAccess.getRootFor(location);
-      final List<ProjectTemplate> templates = [];
+      List<ProjectTemplate> templates;
 
       // TODO(ussuri): Can this no-op `return Future.value()` be removed?
       return new Future.value().then((_) {
@@ -2291,33 +2259,11 @@ class NewProjectAction extends SparkActionWithDialog {
             new TemplateVar('sourceName', name.toLowerCase())
         ];
 
-        // Add a template for the main project type.
-        final SelectElement projectTypeElt = getElement('select[name="type"]');
-        final Match match = _TEMPLATE_REGEX.matchAsPrefix(projectTypeElt.value);
-        assert(match.groupCount > 0);
-        final String templId = match.group(1);
-        final String jsDepsStr = match.group(3);
+        _analyticsTracker.sendEvent('action', 'project-new', _typeElt.value);
 
-        _analyticsTracker.sendEvent('action', 'project-new', templId);
-        templates.add(new ProjectTemplate(templId, globalVars));
-
-        // Possibly also add a mix-in template for JS dependencies, if the
-        // project type requires them.
-        if (jsDepsStr != null) {
-          List<String> jsDeps = [];
-          for (final depName in jsDepsStr.split(',')) {
-            final String depPath = _KNOWN_JS_PACKAGES[depName];
-            assert(depPath != null);
-            jsDeps.add('"$depName": "$depPath"');
-          }
-          if (jsDeps.isNotEmpty) {
-            final localVars = [
-                new TemplateVar('dependencies', jsDeps.join(',\n    '))
-            ];
-            templates.add(
-                new ProjectTemplate("addons/bower_deps", globalVars, localVars));
-          }
-        }
+        // Add templates to be used to create the project.
+        final List<String> ids = _typeElt.value.split('+');
+        templates = ids.map((id) => new ProjectTemplate(id, globalVars));
 
         return new ProjectBuilder(location.entry, templates, spark).build();
       }).then((_) {
@@ -4280,7 +4226,7 @@ class PolymerDesignerAction
     _dialog.getElement('#polymerDesignerClear').onClick.listen(_clearDesign);
     _dialog.getElement('#polymerDesignerRevert').onClick.listen(_revertDesign);
 
-    querySelector('#openPolymerDesignerButton').onClick.listen((_) {
+    spark.getUIElement('#openPolymerDesignerButton').onClick.listen((_) {
       _open(spark.editorManager.currentFile);
     });
   }
