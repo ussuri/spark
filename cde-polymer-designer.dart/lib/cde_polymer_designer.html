@@ -23,11 +23,22 @@
       </svg>
     </div>
 
-    <!--TODO(ussuri): BUG #3466-->
-    <!--<webview id="webview"-->
-    <!--    src="src/index.html"-->
-    <!--    partition="cde-polymer-designer">-->
-    <!--</webview>-->
+
+    <template if="{{entryPoint}} == local">
+      <webview 
+          id="webview"
+          src="src/polymer_designer/index.html",
+          partition="persist:cde-polymer-designer">
+      </webview>
+    </template>
+
+    <template if="{{entryPoint}} == online">
+      <webview 
+          id="webview"
+          src="https://www.polymer-project.org/tools/designer/",
+          partition="persist:cde-polymer-designer">
+      </webview>
+    </template>
   </template>
 
   <script src="cde_polymer_designer.js"></script>

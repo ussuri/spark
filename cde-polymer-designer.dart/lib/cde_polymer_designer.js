@@ -26,23 +26,6 @@ PromiseCompleter.prototype.catch = function(onRejected) {
 };
 
 Polymer('cde-polymer-designer', {
-  // NOTE: Make sure this is in-sync with ide/web/manifest.json.
-  STORAGE_PARTITION_: 'persist:cde-polymer-designer',
-  // NOTE: We must use the full path as viewed by a client app.
-  LOCAL_ENTRY_POINT_:
-      'packages/cde_polymer_designer/src/polymer_designer/index.html',
-  ONLINE_ENTRY_POINT_:
-      'https://www.polymer-project.org/tools/designer/',
-
-  /**
-   * Specifies whether to use the local, compiled-in copy of Polymer Designer
-   * or the online one.
-   *
-   * @attribute attr
-   * @type string
-   */
-  entryPoint: 'local',
-
   /**
    * Initial design code requested in a call to [load].
    */
@@ -52,14 +35,6 @@ Polymer('cde-polymer-designer', {
    * The dynamically created <webview> element.
    */
   webview_: null,
-
-  /**
-   * Resolves after the <webview> has been created, its UI tweaked and the proxy
-   * script injected into it.
-   *
-   * @type: PromiseCompleter
-   */
-  webviewReadyCompleter_: null,
 
   /**
    * Resolves when the asynchronous code export requested from the proxy has
@@ -83,29 +58,13 @@ Polymer('cde-polymer-designer', {
    * - Inserts it into the shadow DOM.
    * - Navigates it to the Polymer Designer local or online entry point.
    *
-   * @return: Promise
+   * @return: void
    */
   load: function(initialCode) {
-    if (this.webviewReadyCompleter_ !== null) {
-      throw "Already loaded or still loading: call unload() first";
-    }
-
-    this.initialCode_ = initialCode;
-
-    // This will be completed in [onWebviewContentLoad_].
-    this.webviewReadyCompleter_ = new PromiseCompleter();
-
-    this.webview_ = document.createElement('webview');
+    this.webview_ = $['webview'];
     this.webview_.addEventListener(
         'contentload', this.onWebviewContentLoad_.bind(this));
-    this.webview_.partition = this.STORAGE_PARTITION_;
-    this.webview_.src =
-        this.entryPoint === 'local' ?
-        this.LOCAL_ENTRY_POINT_ :
-        this.ONLINE_ENTRY_POINT_;
-    this.shadowRoot.appendChild(this.webview_);
-
-    return this.webviewReadyCompleter_.promise;
+    this.initialCode_ = initialCode;
   },
 
   /**
@@ -119,21 +78,19 @@ Polymer('cde-polymer-designer', {
   unload: function() {
     if (this.webview_ !== null) {
       this.webview_.terminate();
-      this.shadowRoot.removeChild(this.webview_);
     }
     this.webview_ = null;
-    this.webviewReadyCompleter_ = null;
     this.getCodeCompleter_ = null;
   },
 
   /**
    * Reinitializes the object from a running state.
    *
-   * @return: Promise
+   * @return: void
    */
   reload: function() {
     this.unload();
-    return this.load();
+    this.load();
   },
 
   /**
