@@ -5,11 +5,11 @@ Chrome Dev Editor (CDE) is a developer tool for building apps on the Chrome plat
 <a href="#">
 <img src="https://raw.githubusercontent.com/dart-lang/spark/master/doc/1px.png" width="220" height="0">
 </a>
-<a target="_blank" href="https://chrome.google.com/webstore/detail/spark/pnoffddplpippgcfjdhbmhkofpnaalpg">
+<!--a target="_blank" href="https://chrome.google.com/webstore/detail/spark/pnoffddplpippgcfjdhbmhkofpnaalpg">
 <img src="https://raw.githubusercontent.com/dart-lang/spark/master/doc/install-button.png">
-</a>
+</a--!>
 
-**Note**: This is a developer preview version of CDE. We're actively working on CDE to add features based on your feedback!
+**Note**: This is a developer preview version of CDE. Active CDE development has stopped in 2014 due to discontinuation the entire Chrome Apps platform.
 
 ![Screenshot](https://raw.githubusercontent.com/dart-lang/spark/master/doc/screenshot1.png)
 
